@@ -22,6 +22,10 @@ await esbuild.build({
   format: 'cjs',
   tsconfig: 'tsconfig.server.json',
   jsx: 'automatic',
+  // esbuild escapes non-ASCII to \uXXXX by default, which triples the size of
+  // the Sinhala and Tamil catalogues and makes the bundle unsearchable. The
+  // rendered HTML already declares UTF-8.
+  charset: 'utf8',
   external,
   minify: false,
   sourcemap: false,

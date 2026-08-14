@@ -8,6 +8,7 @@ import { useEditorStore } from '@/state/editorStore'
 import { SelectionLayer } from './SelectionLayer'
 import { FloatingToolbar } from './FloatingToolbar'
 import { DRAG_TYPE } from '../palette'
+import { LocalePicker } from '@/components/LocalePicker'
 import { PAGE_SIZE_LABEL, ZOOM_STEPS, nextZoom, pageBox } from '@/utils/page'
 
 export function EditorCanvas({
@@ -72,6 +73,7 @@ export function EditorCanvas({
         />
 
         <div className="ml-auto flex items-center gap-[6px]">
+          <LocalePicker className="h-[24px] w-[104px] bg-raised px-1 text-[11px]" />
           <span className="font-mono text-[10.5px] text-faint">
             {PAGE_SIZE_LABEL[template.page.size]} · {template.page.orientation}
           </span>

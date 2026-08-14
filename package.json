@@ -1,7 +1,7 @@
 {
   "name": "templify",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "description": "Templify — a self-hosted report template platform. Your app owns the data; Templify owns the document design.",
   "scripts": {
@@ -27,6 +27,8 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@fontsource/ibm-plex-mono": "^5.3.0",
     "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/noto-sans-sinhala": "^5.3.0",
+    "@fontsource/noto-sans-tamil": "^5.3.0",
     "@fontsource/source-serif-4": "^5.3.0",
     "@lezer/highlight": "^1.2.3",
     "@radix-ui/react-collapsible": "^1.1.3",

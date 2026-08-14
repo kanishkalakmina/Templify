@@ -140,7 +140,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'quotation',
         description: 'Violet-accent quotation with a scope table.',
         architecture: 'doc',
-        options: { accent: '#5B21B6', title: 'QUOTATION', itemLabel: 'Scope' },
+        options: { accent: '#5B21B6', title: '{{@t.quotation}}', itemLabel: '{{@t.scope}}' },
       },
       {
         id: 'quotation-corporate',
@@ -148,7 +148,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'quotation',
         description: 'Banded corporate quotation for formal proposals.',
         architecture: 'doc',
-        options: { accent: '#1E3A8A', band: true, title: 'QUOTATION' },
+        options: { accent: '#1E3A8A', band: true, title: '{{@t.quotation}}' },
       },
       {
         id: 'quotation-simple',
@@ -156,7 +156,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'quotation',
         description: 'Plain monochrome quotation, no fills.',
         architecture: 'doc',
-        options: { accent: '#0F172A', plain: true, title: 'QUOTATION' },
+        options: { accent: '#0F172A', plain: true, title: '{{@t.quotation}}' },
       },
     ],
   },
@@ -170,7 +170,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'receipt',
         description: 'Teal receipt with QR for transaction lookup.',
         architecture: 'doc',
-        options: { accent: '#0F766E', title: 'RECEIPT', qr: true },
+        options: { accent: '#0F766E', title: '{{@t.receipt}}', qr: true },
       },
       {
         id: 'receipt-compact',
@@ -178,7 +178,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'receipt',
         description: 'A5 receipt for short transactions.',
         architecture: 'doc',
-        options: { accent: '#0F172A', plain: true, title: 'RECEIPT' },
+        options: { accent: '#0F172A', plain: true, title: '{{@t.receipt}}' },
         size: 'A5',
       },
       {
@@ -187,7 +187,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'receipt',
         description: 'Slate-toned receipt for corporate accounts.',
         architecture: 'doc',
-        options: { accent: '#334155', title: 'RECEIPT' },
+        options: { accent: '#334155', title: '{{@t.receipt}}' },
       },
     ],
   },
@@ -299,7 +299,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'other',
         description: 'Goods dispatch note with itemised contents.',
         architecture: 'doc',
-        options: { accent: '#334155', title: 'DELIVERY NOTE', plain: true, itemLabel: 'Goods' },
+        options: { accent: '#334155', title: '{{@t.deliveryNote}}', plain: true, itemLabel: '{{@t.goods}}' },
       },
       {
         id: 'purchase-order',
@@ -307,7 +307,7 @@ export const LIBRARY_GROUPS: LibraryGroup[] = [
         category: 'other',
         description: 'Supplier purchase order with order reference.',
         architecture: 'doc',
-        options: { accent: '#1D4ED8', title: 'PURCHASE ORDER' },
+        options: { accent: '#1D4ED8', title: '{{@t.purchaseOrder}}' },
       },
       {
         id: 'audit-report',

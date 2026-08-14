@@ -14,6 +14,8 @@ import path from 'node:path'
 import { config } from './config'
 import { TemplateStore } from './storage'
 import { closeBrowser, htmlToPdf, probeChromium, renderTemplate } from './renderer'
+import { availableScripts } from './fonts'
+import { LOCALES } from '../src/i18n/locales'
 import type { ReportTemplate } from '../src/types/template'
 import { parseHandle, templateAtVersion } from '../src/services/versioning'
 import { BUILT_IN_TEMPLATES } from '../src/templates/builtin'
@@ -52,6 +54,9 @@ app.get('/api/health', async (_req, res) => {
     templates: (await store.list()).length,
     pdf: await probeChromium(),
     auth: config.apiKey ? 'required' : 'open',
+    locales: LOCALES.map((l) => l.code),
+    /** Scripts with embeddable fonts present — anything else renders as boxes. */
+    scripts: availableScripts(),
   })
 })
 
@@ -123,10 +128,17 @@ app.delete('/api/templates/:id', requireKey, async (req, res) => {
 /* -------------------------------------------------------------------------- */
 
 app.post('/api/reports/render', requireKey, async (req, res) => {
-  const { templateId, data, options } = (req.body ?? {}) as {
+  const { templateId, data, locale, options } = (req.body ?? {}) as {
     templateId?: string
     data?: Record<string, unknown>
-    options?: { format?: 'pdf' | 'html'; filename?: string; strict?: boolean }
+    /** Document language. Unrecognised values fall back to English. */
+    locale?: string
+    options?: {
+      format?: 'pdf' | 'html'
+      filename?: string
+      strict?: boolean
+      currency?: string
+    }
   }
 
   if (!templateId) {
@@ -140,7 +152,14 @@ app.post('/api/reports/render', requireKey, async (req, res) => {
     return
   }
 
-  const { html, doc } = renderTemplate(template, data ?? {})
+  const { html, doc } = renderTemplate(template, data ?? {}, {
+    locale,
+    currency: options?.currency,
+  })
+
+  // Tells the caller what was actually used, since an unrecognised locale falls
+  // back rather than erroring.
+  res.setHeader('X-Templify-Locale', doc.locale)
 
   // Unresolved bindings are the integrator's most likely failure mode, so they
   // are always reported. `strict` turns them into a hard error rather than a

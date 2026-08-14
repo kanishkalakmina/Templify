@@ -15,6 +15,7 @@ import { useEditorStore } from '@/state/editorStore'
 import { useTemplateStore } from '@/state/templateStore'
 import { useTestDataStore } from '@/state/testDataStore'
 import { useUiStore } from '@/state/uiStore'
+import { useSettingsStore } from '@/state/settingsStore'
 import { resolveDocument } from '@/services/resolveDocument'
 import {
   arraySources,
@@ -82,11 +83,12 @@ export function EditorPage() {
   }, [stored?.id])
 
   const data = getData(templateId)
+  const locale = useSettingsStore((s) => s.previewLocale)
 
   const doc = useMemo(
-    () => (draft ? resolveDocument(draft, data, { mode: 'edit' }) : null),
+    () => (draft ? resolveDocument(draft, data, { mode: 'edit', locale }) : null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, data, revision],
+    [draft, data, revision, locale],
   )
 
   const sources = useMemo(() => arraySources(data), [data])

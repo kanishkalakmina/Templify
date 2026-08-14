@@ -2,9 +2,11 @@ import { useMemo } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '@/components/ui/Button'
 import { DocumentPage } from '@/render/DocumentPage'
+import { LocalePicker } from '@/components/LocalePicker'
 import { useTemplateStore } from '@/state/templateStore'
 import { useTestDataStore } from '@/state/testDataStore'
 import { useUiStore } from '@/state/uiStore'
+import { useSettingsStore } from '@/state/settingsStore'
 import { resolveDocument } from '@/services/resolveDocument'
 import { parseHandle } from '@/services/versioning'
 
@@ -27,12 +29,13 @@ export function PreviewPage() {
   const template = resolve(templateId)
   // A pinned handle (`invoice-modern:v2`) shares the base template's test data.
   const data = getData(parseHandle(templateId).id)
+  const locale = useSettingsStore((s) => s.previewLocale)
 
   const doc = useMemo(
-    () => (template ? resolveDocument(template, data, { mode: 'print' }) : null),
+    () => (template ? resolveDocument(template, data, { mode: 'print', locale }) : null),
     // `revision` participates so an Apply in the editor is reflected here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [template, data, revision],
+    [template, data, revision, locale],
   )
 
   const from = params.get('from')
@@ -69,7 +72,8 @@ export function PreviewPage() {
         <div className="font-mono text-[10.5px] text-accent">{template.id}</div>
         <div className="font-mono text-[10.5px] text-faint">{`v${template.version}`}</div>
 
-        <div className="ml-auto flex gap-2">
+        <div className="ml-auto flex items-center gap-2">
+          <LocalePicker className="h-[29px] w-[128px] text-[11.5px]" />
           <Button
             variant="primary"
             onClick={() =>

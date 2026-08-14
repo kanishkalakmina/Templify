@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import { PageBody } from '@/app/AppShell'
 import { Select } from '@/components/ui/controls'
 import { DocumentPage } from '@/render/DocumentPage'
+import { LocalePicker } from '@/components/LocalePicker'
 import { useTemplateStore } from '@/state/templateStore'
 import { useTestDataStore } from '@/state/testDataStore'
+import { useSettingsStore } from '@/state/settingsStore'
 import { resolveDocument } from '@/services/resolveDocument'
 import { DEFAULT_TEST_DATA } from '@/data/sampleData'
 
@@ -47,10 +49,11 @@ export function ComparePage() {
   // One payload, deliberately shared: whichever data the selected template was
   // last edited against, falling back to the canonical sample.
   const data = testData[templateId] ?? DEFAULT_TEST_DATA
+  const locale = useSettingsStore((s) => s.previewLocale)
 
   const doc = useMemo(
-    () => (template ? resolveDocument(template, data, { mode: 'print' }) : null),
-    [template, data],
+    () => (template ? resolveDocument(template, data, { mode: 'print', locale }) : null),
+    [template, data, locale],
   )
 
   const request = `POST /api/reports/render
@@ -88,6 +91,11 @@ export function ComparePage() {
                 </option>
               ))}
             </Select>
+          </div>
+
+          <div className="mt-[10px] flex items-center gap-[9px]">
+            <span className="text-[11.5px] text-muted">Language</span>
+            <LocalePicker className="h-[31px] flex-1 text-[11.5px]" />
           </div>
 
           <div className="mt-[14px] whitespace-pre border-t border-line pt-[14px] font-mono text-[11px] leading-[1.9] text-faint">

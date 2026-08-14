@@ -12,7 +12,7 @@ export const SERVER = {
   url: 'http://localhost:8080',
   /** Hostname an application inside the same Docker network would call. */
   internalHost: 'http://templify:8080',
-  version: '1.0.0',
+  version: '1.1.0',
   status: 'Running',
   keyPrefix: 'tf_live_',
   envVar: 'TEMPLIFY_KEY',

@@ -44,7 +44,7 @@ export const config = {
   /** Rejects oversized payloads before they reach the renderer. */
   maxBodySize: process.env.TEMPLIFY_MAX_BODY ?? '8mb',
 
-  version: process.env.TEMPLIFY_VERSION ?? '1.0.0',
+  version: process.env.TEMPLIFY_VERSION ?? '1.1.0',
 } as const
 
 export type Config = typeof config

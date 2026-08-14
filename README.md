@@ -261,6 +261,52 @@ editor shows the token so the author can see the binding, print renders nothing,
 resolver reports every unresolved path — the signal the server will use to return a precise
 `422` instead of silently rendering blanks.
 
+### Languages
+
+A document renders in any of **English, Sinhala, Tamil, French, German, Spanish or
+Portuguese** — from the *same* template. Send a locale with the render request:
+
+```js
+body: JSON.stringify({ templateId: 'invoice-modern', locale: 'si', data: invoiceData })
+```
+
+Or let the payload carry it — `locale`, `language`, `customer.locale` and
+`customer.language` are all picked up, so an application can drive the document language
+straight from the customer record with no extra API field.
+
+Three things change with the locale:
+
+- **Labels.** Built-in templates reference `{{@t.billTo}}` rather than the literal text, and
+  those resolve at render time from a catalogue. One Invoice Modern serves every language —
+  there is no per-language copy of a template to keep in sync.
+- **Numbers and dates.** `55,000` in English, `55.000` in German, `55 000` in French, and
+  `1,03,800` in Tamil (lakh grouping), via `Intl`. Currency codes are placed where each
+  locale expects them rather than always prefixed.
+
+  One deliberate override: ICU's `si-LK` data returns the traditional Buddhist **lunar**
+  month names — `නිකිණි` for August — at every width. Correct for a calendar, wrong on an
+  invoice, so Sinhala uses the Gregorian transliterations (`අගෝස්තු`). Only the month *name*
+  is substituted, via `formatToParts`; ICU still decides field order, separators and
+  numerals, so the date keeps its locale shape (`2026 අගෝස්තු 14`).
+- **Fonts.** IBM Plex has no Sinhala or Tamil coverage, so those scripts would otherwise
+  render as boxes — silently. Noto Sans Sinhala and Noto Sans Tamil are registered under the
+  *same* family names with a `unicode-range` limited to their block, so the browser resolves
+  per glyph: Latin from IBM Plex, Sinhala from Noto, and a template naming
+  `'IBM Plex Sans'` needs no change. Only the script a document actually uses is embedded.
+
+`{{@t.*}}` is a reserved namespace, like `{{@index}}` — it can never collide with a data
+path, and it is excluded from missing-binding reporting.
+
+**Adding a language** means one entry per key in `src/i18n/documentStrings.ts` plus a line in
+`src/i18n/locales.ts`. A non-Latin script also needs its `@fontsource` package added to
+`server/fonts.ts`. `npm run verify` fails if any locale is missing a key or is a verbatim
+copy of English.
+
+**Known gap:** template-specific titles ("Security Audit Report", "CERTIFICATE OF
+ACHIEVEMENT") stay English — they are template identity rather than generic labels, so
+translating them would mean inventing catalogue keys per template. Edit those in the editor,
+or add keys for them.
+
 **Adding a field that does not exist yet.** Bindings are free text, so you can always just
 type `{{invoice.poNumber}}`. To make it a first-class part of the template, use
 **Insert Variable → New variable**: give it a path and a sample value, and Templify

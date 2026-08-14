@@ -1,14 +1,74 @@
 import type { FormatKind } from '@/types/template'
+import { DEFAULT_LOCALE, localeMeta, type LocaleCode } from '@/i18n/locales'
 
 /**
- * Thousands-separated, with decimals only when the value actually has them:
- * 50000 -> "50,000" and 1234.5 -> "1,234.5". Document layouts read better
- * without trailing ".00" on whole amounts.
+ * Value formatting for rendered documents.
+ *
+ * Every formatter is locale-aware. `Intl` objects are expensive to construct and
+ * a table can call these thousands of times per render, so they are cached per
+ * locale rather than built per cell.
  */
-const NUMBER = new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-/** Currency keeps two decimals — money with a symbol should not lose cents. */
-const MONEY = new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
+
+interface Formatters {
+  /** Thousands-separated, decimals only when the value has them. */
+  number: Intl.NumberFormat
+  /** Money without a symbol — two decimals always. */
+  money: Intl.NumberFormat
+  integer: Intl.NumberFormat
+}
+
+const CACHE = new Map<string, Formatters>()
+
+function formatters(locale: LocaleCode): Formatters {
+  const cached = CACHE.get(locale)
+  if (cached) return cached
+
+  const tag = localeMeta(locale).intlTag
+  const built: Formatters = {
+    number: new Intl.NumberFormat(tag, { minimumFractionDigits: 0, maximumFractionDigits: 2 }),
+    money: new Intl.NumberFormat(tag, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+    integer: new Intl.NumberFormat(tag, { maximumFractionDigits: 0 }),
+  }
+  CACHE.set(locale, built)
+  return built
+}
+
+const CURRENCY_CACHE = new Map<string, Intl.NumberFormat>()
+
+/**
+ * Currency formatting via `Intl`, which places the symbol where the locale
+ * expects it — `$1,234.56` for en, `1.234,56 €` for de — rather than always
+ * prefixing it.
+ */
+function currencyFormatter(locale: LocaleCode, currency: string): Intl.NumberFormat | null {
+  const key = `${locale}:${currency}`
+  const cached = CURRENCY_CACHE.get(key)
+  if (cached) return cached
+  try {
+    const built = new Intl.NumberFormat(localeMeta(locale).intlTag, {
+      style: 'currency',
+      currency,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+    CURRENCY_CACHE.set(key, built)
+    return built
+  } catch {
+    // An unrecognised currency code must not abort a render.
+    return null
+  }
+}
+
+export interface FormatOptions {
+  locale?: LocaleCode
+  /**
+   * ISO code (`LKR`) or a bare symbol. An ISO code goes through `Intl`;
+   * anything else is prefixed, so `data.currency: "Rs."` still works.
+   */
+  currency?: string
+}
+
+const ISO_CURRENCY = /^[A-Z]{3}$/
 
 /**
  * Turns a resolved data value into display text.
@@ -17,30 +77,42 @@ const INTEGER = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 })
  * missing keys or hold the wrong type, and a report should degrade to a sane
  * string rather than throw mid-render.
  */
-export function formatValue(value: unknown, kind: FormatKind = 'text', currency = ''): string {
+export function formatValue(
+  value: unknown,
+  kind: FormatKind = 'text',
+  options: FormatOptions = {},
+): string {
   if (value === null || value === undefined) return ''
+
+  const locale = options.locale ?? DEFAULT_LOCALE
+  const fmt = formatters(locale)
 
   switch (kind) {
     case 'currency': {
       const n = toNumber(value)
       if (n === null) return String(value)
+      const currency = options.currency ?? ''
+      if (ISO_CURRENCY.test(currency)) {
+        const intl = currencyFormatter(locale, currency)
+        if (intl) return intl.format(n)
+      }
       const prefix = currency ? `${currency} ` : ''
-      return `${prefix}${MONEY.format(n)}`
+      return `${prefix}${fmt.money.format(n)}`
     }
     case 'number': {
       const n = toNumber(value)
-      return n === null ? String(value) : NUMBER.format(n)
+      return n === null ? String(value) : fmt.number.format(n)
     }
     case 'integer': {
       const n = toNumber(value)
-      return n === null ? String(value) : INTEGER.format(n)
+      return n === null ? String(value) : fmt.integer.format(n)
     }
     case 'percent': {
       const n = toNumber(value)
-      return n === null ? String(value) : `${INTEGER.format(n)}%`
+      return n === null ? String(value) : `${fmt.integer.format(n)}%`
     }
     case 'date':
-      return formatDate(value, 'medium')
+      return formatDate(value, 'medium', locale)
     case 'text':
     default:
       if (typeof value === 'object') return JSON.stringify(value)
@@ -57,19 +129,82 @@ export function toNumber(value: unknown): number | null {
   return null
 }
 
-export function formatDate(value: unknown, pattern: 'long' | 'medium' | 'short' | 'iso'): string {
+export type DatePattern = 'long' | 'medium' | 'short' | 'iso'
+
+/**
+ * Month-name overrides where ICU's data is not what a business document wants.
+ *
+ * `si-LK` returns the traditional Buddhist lunar months for every month and
+ * every width — දුරුතු, නවම්, මැදින්, බක්… — which is correct for a calendar but
+ * wrong on an invoice, where a Sri Lankan reader expects the Gregorian
+ * transliterations. Only the month *name* is substituted: ICU still decides the
+ * field order, separators and numerals, so the date keeps its locale shape.
+ */
+const MONTH_NAMES: Partial<Record<LocaleCode, string[]>> = {
+  si: [
+    'ජනවාරි',
+    'පෙබරවාරි',
+    'මාර්තු',
+    'අප්‍රේල්',
+    'මැයි',
+    'ජූනි',
+    'ජූලි',
+    'අගෝස්තු',
+    'සැප්තැම්බර්',
+    'ඔක්තෝබර්',
+    'නොවැම්බර්',
+    'දෙසැම්බර්',
+  ],
+}
+
+/**
+ * Formats with ICU, then swaps the month name where we override it.
+ * `formatToParts` is what makes this safe — no pattern parsing, no guessing.
+ */
+function formatWithMonthOverride(
+  date: Date,
+  tag: string,
+  locale: LocaleCode,
+  options: Intl.DateTimeFormatOptions,
+): string {
+  const override = MONTH_NAMES[locale]
+  if (!override) return date.toLocaleDateString(tag, options)
+
+  return new Intl.DateTimeFormat(tag, options)
+    .formatToParts(date)
+    .map((part) => (part.type === 'month' ? override[date.getMonth()] ?? part.value : part.value))
+    .join('')
+}
+
+export function formatDate(
+  value: unknown,
+  pattern: DatePattern,
+  locale: LocaleCode = DEFAULT_LOCALE,
+): string {
   const d = toDate(value)
   if (!d) return typeof value === 'string' ? value : ''
+
+  // ISO is deliberately locale-independent — it is a machine format.
+  if (pattern === 'iso') return d.toISOString().slice(0, 10)
+
+  const tag = localeMeta(locale).intlTag
   switch (pattern) {
-    case 'iso':
-      return d.toISOString().slice(0, 10)
     case 'short':
-      return d.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' })
+      // Numeric only — no month name, so no override applies.
+      return d.toLocaleDateString(tag, { month: 'numeric', day: 'numeric', year: '2-digit' })
     case 'long':
-      return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+      return formatWithMonthOverride(d, tag, locale, {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      })
     case 'medium':
     default:
-      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+      return formatWithMonthOverride(d, tag, locale, {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      })
   }
 }
 
@@ -83,7 +218,12 @@ function toDate(value: unknown): Date | null {
   return null
 }
 
-/** "2 minutes ago", "Yesterday", "Aug 10, 2026". */
+/**
+ * "2 minutes ago", "Yesterday", "Aug 10, 2026".
+ *
+ * Editor chrome rather than document content, so it stays in the interface
+ * language (English) — translating the editor is a separate piece of work.
+ */
 export function relativeTime(iso: string): string {
   const then = new Date(iso).getTime()
   if (Number.isNaN(then)) return ''

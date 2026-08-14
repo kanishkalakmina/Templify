@@ -35,11 +35,13 @@ export function documentToHtml(doc: ResolvedDocument): string {
   const markup = renderToStaticMarkup(<DocumentPage doc={doc} scale={1} shadow="none" />)
   const css = PRINT_CSS.replace('%WIDTH%', String(doc.width)).replace('%HEIGHT%', String(doc.height))
 
+  // Only the document's own script is embedded — an English invoice should not
+  // carry Sinhala outlines.
   return `<!doctype html>
-<html>
+<html lang="${doc.locale}" dir="${doc.direction}">
 <head>
 <meta charset="utf-8">
-<style>${fontFaceCss()}</style>
+<style>${fontFaceCss(doc.script)}</style>
 <style>${css}</style>
 </head>
 <body>${markup}</body>
@@ -51,8 +53,16 @@ export interface RenderResult {
   doc: ResolvedDocument
 }
 
-export function renderTemplate(template: ReportTemplate, data: ReportData): RenderResult {
-  const doc = resolveDocument(template, data, { mode: 'print' })
+export function renderTemplate(
+  template: ReportTemplate,
+  data: ReportData,
+  options: { locale?: string; currency?: string } = {},
+): RenderResult {
+  const doc = resolveDocument(template, data, {
+    mode: 'print',
+    locale: options.locale,
+    currency: options.currency,
+  })
   return { html: documentToHtml(doc), doc }
 }
 

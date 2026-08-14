@@ -31,6 +31,7 @@ import type {
 } from '@/types/template'
 import type { BindingScope } from './binding'
 import {
+  documentLabel,
   hasBinding,
   interpolate,
   isSingleToken,
@@ -44,6 +45,7 @@ import {
 import { evaluateConditions } from './conditions'
 import { formatValue, toNumber } from '@/utils/format'
 import { pageBox } from '@/utils/page'
+import { resolveLocale, type LocaleCode, type Script } from '@/i18n/locales'
 
 /* -------------------------------------------------------------------------- */
 /* Resolved shapes                                                             */
@@ -135,6 +137,11 @@ export interface ResolvedDocument {
   width: number
   height: number
   mode: RenderMode
+  /** Locale the document was rendered in. */
+  locale: LocaleCode
+  /** Writing system, so a renderer knows which fonts it must supply. */
+  script: Script
+  direction: 'ltr' | 'rtl'
   nodes: ResolvedNode[]
   /** Paths referenced by the template but absent from the data. */
   missingBindings: string[]
@@ -142,8 +149,10 @@ export interface ResolvedDocument {
 
 export interface ResolveOptions {
   mode?: RenderMode
-  /** Prefix for `currency`-formatted values. Auto-detected when omitted. */
+  /** ISO code or bare symbol for `currency` values. Auto-detected when omitted. */
   currency?: string
+  /** Document language. Falls back to English for anything unrecognised. */
+  locale?: LocaleCode | string
 }
 
 /* -------------------------------------------------------------------------- */
@@ -156,11 +165,13 @@ export function resolveDocument(
   options: ResolveOptions = {},
 ): ResolvedDocument {
   const mode = options.mode ?? 'edit'
-  const currency = options.currency ?? detectCurrency(data)
+  // An explicit locale wins; otherwise the payload may carry one.
+  const meta = resolveLocale(options.locale ?? detectLocale(data))
+  const currency = options.currency ?? detectCurrency(data) ?? meta.currency
   const scope = rootScope(data)
   const missing = new Set<string>()
 
-  const ctx: ResolveContext = { mode, currency, missing }
+  const ctx: ResolveContext = { mode, currency, missing, locale: meta.code }
   const nodes = resolveElements(template.elements, scope, ctx, 0, 0, '')
 
   const { width, height } = pageBox(template.page)
@@ -169,6 +180,9 @@ export function resolveDocument(
     width,
     height,
     mode,
+    locale: meta.code,
+    script: meta.script,
+    direction: meta.direction,
     nodes,
     missingBindings: [...missing],
   }
@@ -178,17 +192,32 @@ interface ResolveContext {
   mode: RenderMode
   currency: string
   missing: Set<string>
+  locale: LocaleCode
 }
 
 /** Picks up a currency symbol from common payload locations. */
-function detectCurrency(data: ReportData): string {
+function detectCurrency(data: ReportData): string | undefined {
   const candidates = ['currency', 'invoice.currency', 'company.currency', 'settings.currency']
   const scope = rootScope(data)
   for (const path of candidates) {
     const value = resolvePath(scope, path)
     if (typeof value === 'string' && value.trim()) return value.trim()
   }
-  return ''
+  return undefined
+}
+
+/**
+ * Lets a payload carry its own language, so an application can drive the
+ * document locale from the customer record without a separate API field.
+ */
+function detectLocale(data: ReportData): string | undefined {
+  const candidates = ['locale', 'language', 'customer.locale', 'customer.language', 'invoice.locale']
+  const scope = rootScope(data)
+  for (const path of candidates) {
+    const value = resolvePath(scope, path)
+    if (typeof value === 'string' && value.trim()) return value.trim()
+  }
+  return undefined
 }
 
 /* -------------------------------------------------------------------------- */
@@ -372,16 +401,23 @@ function resolveField(
   // apply to a real number or date rather than to its string form.
   if (isSingleToken(trimmed)) {
     const { path, format: inline } = parseToken(trimmed.slice(2, -2))
+
+    // A translated label is text, not data — it must be resolved here too, or a
+    // `{{@t.*}}` used as a *value* (rather than a header) renders blank.
+    const label = documentLabel(path, ctx.locale)
+    if (label !== null) return label
+
     trackMissing(trimmed, scope, ctx)
     const value = resolvePath(scope, path)
     if (value === undefined || value === null) return ctx.mode === 'edit' ? trimmed : ''
-    return formatValue(value, inline ?? format, ctx.currency)
+    return formatValue(value, inline ?? format, { currency: ctx.currency, locale: ctx.locale })
   }
 
   // Literal text with tokens embedded in it.
   trackMissing(trimmed, scope, ctx)
   return interpolate(trimmed, scope, {
     currency: ctx.currency,
+    locale: ctx.locale,
     onMissing: ctx.mode === 'edit' ? 'token' : 'empty',
   })
 }
@@ -396,7 +432,7 @@ function resolveText(element: TemplateElement, scope: BindingScope, ctx: Resolve
   if (element.dataBinding) {
     trackMissing(element.dataBinding, scope, ctx)
     const value = resolveValue(element.dataBinding, scope)
-    if (value !== undefined && value !== null) return formatValue(value, 'text', ctx.currency)
+    if (value !== undefined && value !== null) return formatValue(value, 'text', { currency: ctx.currency, locale: ctx.locale })
     return ctx.mode === 'edit' ? element.dataBinding : ''
   }
 
@@ -418,13 +454,14 @@ function resolveText(element: TemplateElement, scope: BindingScope, ctx: Resolve
     const config = element.props?.date
     if (config?.source === 'binding' && config.value) {
       const value = resolveValue(config.value, scope)
-      return `${config.prefix ?? ''}${formatValue(value, 'date', ctx.currency)}`
+      return `${config.prefix ?? ''}${formatValue(value, 'date', { currency: ctx.currency, locale: ctx.locale })}`
     }
-    return `${config?.prefix ?? ''}${formatValue(new Date().toISOString(), 'date', ctx.currency)}`
+    return `${config?.prefix ?? ''}${formatValue(new Date().toISOString(), 'date', { currency: ctx.currency, locale: ctx.locale })}`
   }
 
   return interpolate(element.content, scope, {
     currency: ctx.currency,
+    locale: ctx.locale,
     onMissing: ctx.mode === 'edit' ? 'token' : 'empty',
   })
 }
@@ -436,7 +473,7 @@ function resolveTable(element: TemplateElement, scope: BindingScope, ctx: Resolv
   const totalWeight = config.columns.reduce((sum, c) => sum + (c.width > 0 ? c.width : 1), 0) || 1
   const columns: ResolvedTableColumn[] = config.columns.map((c) => ({
     id: c.id,
-    header: interpolate(c.header, scope, { currency: ctx.currency }),
+    header: interpolate(c.header, scope, { currency: ctx.currency, locale: ctx.locale }),
     widthFraction: (c.width > 0 ? c.width : 1) / totalWeight,
     align: c.align,
   }))
@@ -461,7 +498,7 @@ function resolveChart(element: TemplateElement, scope: BindingScope, ctx: Resolv
 
   const points: ResolvedChartPoint[] = items.map((item, index) => {
     const rowScope = itemScope(scope, item, index, items.length)
-    const label = interpolate(config.labelBinding, rowScope, { currency: ctx.currency }) || `#${index + 1}`
+    const label = interpolate(config.labelBinding, rowScope, { currency: ctx.currency, locale: ctx.locale }) || `#${index + 1}`
     const value = toNumber(resolveValue(config.valueBinding, rowScope)) ?? 0
     return { label, value }
   })
@@ -480,7 +517,7 @@ function resolveKeyValue(
   if (!config) return []
   return config.rows.map((row) => ({
     id: row.id,
-    label: interpolate(row.label, scope, { currency: ctx.currency }),
+    label: interpolate(row.label, scope, { currency: ctx.currency, locale: ctx.locale }),
     value: resolveField(row.value, scope, row.format, ctx),
   }))
 }
@@ -491,7 +528,7 @@ function resolveList(element: TemplateElement, scope: BindingScope, ctx: Resolve
   const items = resolveArray(config.dataSource, scope)
   return items.map((item, index) => {
     const rowScope = itemScope(scope, item, index, items.length)
-    return interpolate(config.itemBinding, rowScope, { currency: ctx.currency })
+    return interpolate(config.itemBinding, rowScope, { currency: ctx.currency, locale: ctx.locale })
   })
 }
 
@@ -544,6 +581,10 @@ function trackMissing(text: string | undefined, scope: BindingScope, ctx: Resolv
   for (const match of text.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)) {
     const path = match[1].split('|')[0].trim()
     if (!path) continue
+    // `@`-prefixed paths are reserved namespaces — translated labels (`@t.*`)
+    // and row metadata (`@index`) — not payload paths, so they can never be
+    // "missing" and must not pollute the diagnostic an integrator relies on.
+    if (path.startsWith('@')) continue
     const value = resolvePath(scope, path)
     if (value === undefined) ctx.missing.add(path)
   }

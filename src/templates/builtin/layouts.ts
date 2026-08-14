@@ -321,7 +321,7 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       color: subColor,
       lineHeight: 1.65,
     }),
-    heading('docTitle', 446, 44, 300, 44, options.title ?? 'INVOICE', {
+    heading('docTitle', 446, 44, 300, 44, options.title ?? '{{@t.invoice}}', {
       fontFamily: display,
       fontSize: options.big ? 36 : 29,
       fontWeight: 700,
@@ -335,7 +335,7 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       textAlign: 'right',
       color: headColor,
     }),
-    text('docDate', 446, dark ? 116 : 114, 300, 16, 'Issued {{invoice.date | date}}', {
+    text('docDate', 446, dark ? 116 : 114, 300, 16, '{{@t.issued}} {{invoice.date | date}}', {
       fontSize: 10,
       textAlign: 'right',
       color: subColor,
@@ -346,7 +346,7 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
 
   elements.push(
     divider('rule1', 48, top, 698),
-    text('billLbl', 48, top + 22, 240, 14, 'BILL TO', {
+    text('billLbl', 48, top + 22, 240, 14, '{{@t.billTo}}', {
       fontSize: 8.5,
       fontWeight: 600,
       letterSpacing: 1.6,
@@ -356,7 +356,7 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       fontSize: 11,
       lineHeight: 1.7,
     }),
-    text('payLbl', 446, top + 22, 300, 14, 'PAYMENT', {
+    text('payLbl', 446, top + 22, 300, 14, '{{@t.payment}}', {
       fontSize: 8.5,
       fontWeight: 600,
       letterSpacing: 1.6,
@@ -364,9 +364,9 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       textAlign: 'right',
     }),
     keyValue('pay', 446, top + 40, 300, 64, [
-      { id: 'pay-due', label: 'Due', value: '{{invoice.dueDate}}', format: 'date' as const },
-      textRow('pay-method', 'Method', 'Bank Transfer'),
-      textRow('pay-account', 'Account', '**** **** 4021'),
+      { id: 'pay-due', label: '{{@t.due}}', value: '{{invoice.dueDate}}', format: 'date' as const },
+      textRow('pay-method', '{{@t.method}}', '{{@t.bankTransfer}}'),
+      textRow('pay-account', '{{@t.account}}', '**** **** 4021'),
     ]),
   )
 
@@ -380,10 +380,10 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       698,
       150,
       [
-        column('c-item', options.itemLabel ?? 'Item', '{{item.name}}', 0.5, 'left'),
-        column('c-qty', 'Qty', '{{item.quantity}}', 0.12, 'right', 'integer'),
-        column('c-price', 'Price', '{{item.price}}', 0.19, 'right', 'number'),
-        column('c-total', 'Amount', '{{item.total}}', 0.19, 'right', 'number'),
+        column('c-item', options.itemLabel ?? '{{@t.item}}', '{{item.name}}', 0.5, 'left'),
+        column('c-qty', '{{@t.qty}}', '{{item.quantity}}', 0.12, 'right', 'integer'),
+        column('c-price', '{{@t.price}}', '{{item.price}}', 0.19, 'right', 'number'),
+        column('c-total', '{{@t.amount}}', '{{item.total}}', 0.19, 'right', 'number'),
       ],
       { accent, plain: options.plain },
     ),
@@ -394,10 +394,10 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       300,
       104,
       [
-        row('t-sub', 'Subtotal', '{{invoice.subtotal}}'),
-        row('t-disc', 'Discount', '{{invoice.discount}}'),
-        row('t-tax', 'Tax', '{{invoice.tax}}'),
-        row('t-total', 'Total', '{{invoice.total}}', true),
+        row('t-sub', '{{@t.subtotal}}', '{{invoice.subtotal}}'),
+        row('t-disc', '{{@t.discount}}', '{{invoice.discount}}'),
+        row('t-tax', '{{@t.tax}}', '{{invoice.tax}}'),
+        row('t-total', '{{@t.total}}', '{{invoice.total}}', true),
       ],
       { gap: 8, accent, divideLast: true },
     ),
@@ -412,7 +412,7 @@ export function docLayout(options: LayoutOptions = {}): TemplateElement[] {
       1034,
       698,
       30,
-      options.footer ?? 'Thank you for your business. Payment is due within 15 days.',
+      options.footer ?? '{{@t.invoiceFooter}}',
       { fontSize: 9.5, textAlign: 'center', color: LABEL },
     ),
   )
@@ -428,7 +428,7 @@ export function reportLayout(options: LayoutOptions = {}): TemplateElement[] {
   const accent = options.accent ?? '#2F6FED'
   const display = options.serif ? SERIF : SANS
 
-  const kpis = ['Revenue', 'Expenses', 'Net'].map((label, index) => ({
+  const kpis = ['{{@t.revenue}}', '{{@t.expenses}}', '{{@t.net}}'].map((label, index) => ({
     id: `kpi${index}`,
     type: 'kpi' as const,
     name: `${label} KPI`,
@@ -457,20 +457,20 @@ export function reportLayout(options: LayoutOptions = {}): TemplateElement[] {
       color: HEADING,
       letterSpacing: -0.4,
     }),
-    text('sub', 48, 158, 560, 20, 'Prepared for {{customer.name}} · {{invoice.date | date}}', {
+    text('sub', 48, 158, 560, 20, '{{@t.preparedFor}} {{customer.name}} · {{invoice.date | date}}', {
       fontSize: 11,
       color: '#64748B',
     }),
     divider('rule', 48, 196, 698),
     ...kpis,
-    text('s1', 48, 326, 698, 20, 'Summary', { fontSize: 13, fontWeight: 600, color: HEADING }),
+    text('s1', 48, 326, 698, 20, '{{@t.summary}}', { fontSize: 13, fontWeight: 600, color: HEADING }),
     text(
       's1b',
       48,
       350,
       698,
       54,
-      'This period is compared against the preceding cycle. Figures are supplied by the calling application and bound to this template at render time.',
+      '{{@t.summaryBody}}',
       { fontSize: 10.5, lineHeight: 1.7, color: '#475569' },
     ),
     {
@@ -496,7 +496,7 @@ export function reportLayout(options: LayoutOptions = {}): TemplateElement[] {
         },
       },
     },
-    text('s2', 48, 596, 698, 20, 'Line items', { fontSize: 13, fontWeight: 600, color: HEADING }),
+    text('s2', 48, 596, 698, 20, '{{@t.lineItems}}', { fontSize: 13, fontWeight: 600, color: HEADING }),
     table(
       'items',
       48,
@@ -504,13 +504,13 @@ export function reportLayout(options: LayoutOptions = {}): TemplateElement[] {
       698,
       150,
       [
-        column('c-desc', 'Description', '{{item.name}}', 0.56, 'left'),
-        column('c-qty', 'Qty', '{{item.quantity}}', 0.14, 'right', 'integer'),
-        column('c-value', 'Value', '{{item.total}}', 0.3, 'right', 'number'),
+        column('c-desc', '{{@t.description}}', '{{item.name}}', 0.56, 'left'),
+        column('c-qty', '{{@t.qty}}', '{{item.quantity}}', 0.14, 'right', 'integer'),
+        column('c-value', '{{@t.value}}', '{{item.total}}', 0.3, 'right', 'number'),
       ],
       { accent },
     ),
-    text('footer', 48, 1034, 698, 30, '{{company.name}} · Confidential', {
+    text('footer', 48, 1034, 698, 30, '{{company.name}} · {{@t.confidential}}', {
       fontSize: 9.5,
       textAlign: 'center',
       color: LABEL,
@@ -556,7 +556,7 @@ export function certificateLayout(options: LayoutOptions = {}): TemplateElement[
       lineHeight: 1.25,
     }),
     divider('rule', 317, 340, 160, accent),
-    text('pre', 97, 372, 600, 20, 'This certifies that', {
+    text('pre', 97, 372, 600, 20, '{{@t.certifiesThat}}', {
       ...centred,
       fontSize: 11.5,
       color: '#64748B',
@@ -573,12 +573,12 @@ export function certificateLayout(options: LayoutOptions = {}): TemplateElement[
       470,
       520,
       70,
-      'has successfully completed the programme of study and met all requirements set out by the awarding body.',
+      '{{@t.certificateBody}}',
       { ...centred, fontSize: 11.5, lineHeight: 1.85, color: '#475569' },
     ),
     qrCode('qr', 357, 790, 80),
-    signature('sig1', 120, 900, 220, 'Authorised Signature', SERIF),
-    signature('sig2', 454, 900, 220, 'Issued {{invoice.date | date}}', SERIF),
+    signature('sig1', 120, 900, 220, '{{@t.authorisedSignature}}', SERIF),
+    signature('sig2', 454, 900, 220, '{{@t.issued}} {{invoice.date | date}}', SERIF),
   ]
 }
 
@@ -592,19 +592,19 @@ export function payslipLayout(options: LayoutOptions = {}): TemplateElement[] {
   return [
     band('band', 794, 112, accent),
     logo('logo', 48, 32, 130, 44, 'left', true),
-    heading('title', 446, 36, 300, 30, 'PAYSLIP', {
+    heading('title', 446, 36, 300, 30, '{{@t.payslip}}', {
       fontSize: 24,
       fontWeight: 700,
       textAlign: 'right',
       color: '#FFFFFF',
       letterSpacing: 2,
     }),
-    text('period', 446, 70, 300, 18, 'Period ending {{invoice.date | date}}', {
+    text('period', 446, 70, 300, 18, '{{@t.periodEnding}} {{invoice.date | date}}', {
       fontSize: 10,
       textAlign: 'right',
       color: 'rgba(255,255,255,.75)',
     }),
-    text('empLbl', 48, 146, 300, 14, 'EMPLOYEE', {
+    text('empLbl', 48, 146, 300, 14, '{{@t.employee}}', {
       fontSize: 8.5,
       fontWeight: 600,
       letterSpacing: 1.6,
@@ -615,9 +615,9 @@ export function payslipLayout(options: LayoutOptions = {}): TemplateElement[] {
       lineHeight: 1.7,
     }),
     keyValue('meta', 446, 164, 300, 60, [
-      textRow('m-id', 'Employee ID', '{{invoice.number}}'),
-      textRow('m-dept', 'Department', 'Engineering'),
-      { id: 'm-date', label: 'Pay date', value: '{{invoice.dueDate}}', format: 'date' as const },
+      textRow('m-id', '{{@t.employeeId}}', '{{invoice.number}}'),
+      textRow('m-dept', '{{@t.department}}', '{{@t.engineering}}'),
+      { id: 'm-date', label: '{{@t.payDate}}', value: '{{invoice.dueDate}}', format: 'date' as const },
     ]),
     table(
       'items',
@@ -626,9 +626,9 @@ export function payslipLayout(options: LayoutOptions = {}): TemplateElement[] {
       698,
       150,
       [
-        column('c-earn', 'Earnings', '{{item.name}}', 0.6, 'left'),
-        column('c-units', 'Units', '{{item.quantity}}', 0.16, 'right', 'integer'),
-        column('c-amount', 'Amount', '{{item.total}}', 0.24, 'right', 'number'),
+        column('c-earn', '{{@t.earnings}}', '{{item.name}}', 0.6, 'left'),
+        column('c-units', '{{@t.units}}', '{{item.quantity}}', 0.16, 'right', 'integer'),
+        column('c-amount', '{{@t.amount}}', '{{item.total}}', 0.24, 'right', 'number'),
       ],
       { accent },
     ),
@@ -639,10 +639,10 @@ export function payslipLayout(options: LayoutOptions = {}): TemplateElement[] {
       300,
       104,
       [
-        row('p-gross', 'Gross', '{{invoice.subtotal}}'),
-        row('p-ded', 'Deductions', '{{invoice.discount}}'),
-        row('p-tax', 'Tax', '{{invoice.tax}}'),
-        row('p-net', 'Net pay', '{{invoice.total}}', true),
+        row('p-gross', '{{@t.gross}}', '{{invoice.subtotal}}'),
+        row('p-ded', '{{@t.deductions}}', '{{invoice.discount}}'),
+        row('p-tax', '{{@t.tax}}', '{{invoice.tax}}'),
+        row('p-net', '{{@t.netPay}}', '{{invoice.total}}', true),
       ],
       { gap: 8, accent, divideLast: true },
     ),
@@ -652,7 +652,7 @@ export function payslipLayout(options: LayoutOptions = {}): TemplateElement[] {
       1034,
       698,
       30,
-      'This payslip is computer generated and does not require a signature.',
+      '{{@t.payslipFooter}}',
       { fontSize: 9.5, textAlign: 'center', color: LABEL },
     ),
   ]

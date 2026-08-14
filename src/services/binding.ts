@@ -12,6 +12,8 @@
 import type { ReportData, VariableNode } from '@/types/data'
 import type { FormatKind, VariableType } from '@/types/template'
 import { formatValue } from '@/utils/format'
+import { DEFAULT_LOCALE, type LocaleCode } from '@/i18n/locales'
+import { documentString } from '@/i18n/documentStrings'
 
 /* -------------------------------------------------------------------------- */
 /* Scope                                                                       */
@@ -152,9 +154,29 @@ export function resolvePath(scope: BindingScope, path: string): unknown {
 /* Interpolation                                                               */
 /* -------------------------------------------------------------------------- */
 
+/** Reserved token namespace for translated document labels: `{{@t.billTo}}`. */
+export const LABEL_PREFIX = '@t.'
+
+/**
+ * Resolves `@t.key` against the document string catalogue, or returns null when
+ * the path is ordinary data.
+ *
+ * The `@` prefix keeps this namespace separate from customer data — it cannot
+ * collide with a JSON key, and matches the existing `@index` / `@total`
+ * convention.
+ */
+export function documentLabel(path: string, locale: LocaleCode): string | null {
+  const trimmed = path.trim()
+  if (!trimmed.startsWith(LABEL_PREFIX)) return null
+  const key = trimmed.slice(LABEL_PREFIX.length)
+  return key ? documentString(key, locale) : null
+}
+
 export interface InterpolateOptions {
-  /** Currency prefix applied to `currency`-formatted tokens. */
+  /** ISO code (`LKR`) or a bare symbol for `currency`-formatted tokens. */
   currency?: string
+  /** Locale driving number, date, currency and label resolution. */
+  locale?: LocaleCode
   /**
    * Rendered in place of a token whose value is missing. The editor shows the
    * token itself so the author can see the binding; print shows nothing.
@@ -172,13 +194,19 @@ export function interpolate(
   options: InterpolateOptions = {},
 ): string {
   if (!text) return ''
-  const { currency = '', onMissing = 'empty' } = options
+  const { currency = '', onMissing = 'empty', locale = DEFAULT_LOCALE } = options
 
   return text.replace(TOKEN_RE, (whole, inner: string) => {
     const { path, format } = parseToken(inner)
+
+    // Translated labels resolve from the catalogue, not the payload — which is
+    // what lets one template render in any language.
+    const label = documentLabel(path, locale)
+    if (label !== null) return label
+
     const value = resolvePath(scope, path)
     if (value === undefined || value === null) return onMissing === 'token' ? whole : ''
-    return formatValue(value, format ?? 'text', currency)
+    return formatValue(value, format ?? 'text', { currency, locale })
   })
 }
 

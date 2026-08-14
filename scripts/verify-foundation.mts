@@ -46,6 +46,7 @@ try {
   const factory = await server.ssrLoadModule('/src/services/elementFactory.ts')
   const sample = await server.ssrLoadModule('/src/data/sampleData.ts')
   const builtinLayouts = await server.ssrLoadModule('/src/templates/builtin/layouts.ts')
+  const builtin = await server.ssrLoadModule('/src/templates/builtin/index.ts')
 
   const data = sample.DEFAULT_TEST_DATA
   const scope = binding.rootScope(data)
@@ -239,6 +240,142 @@ try {
   const chartNode = reportDoc.nodes.find((n: any) => n.type === 'chart')
   check('chart binds to the data', chartNode?.chart.points.length, 2)
   check('chart computes a max', chartNode?.chart.max, 50000)
+
+  section('i18n — catalogue coverage')
+  const locales = await server.ssrLoadModule('/src/i18n/locales.ts')
+  const strings = await server.ssrLoadModule('/src/i18n/documentStrings.ts')
+  const keys = strings.documentStringKeys()
+  check('label keys defined', keys.length > 40, true)
+
+  const incomplete: string[] = []
+  for (const meta of locales.LOCALES) {
+    const catalogue = strings.catalogueFor(meta.code)
+    const missingKeys = keys.filter((k: string) => !catalogue[k])
+    if (missingKeys.length) incomplete.push(`${meta.code}: ${missingKeys.slice(0, 3).join(',')}`)
+  }
+  check('every locale has every key', incomplete, [])
+  check('all 7 locales present', locales.LOCALES.length, 7)
+
+  // A translation that is merely the English string back is a silent gap.
+  const untranslated = locales.LOCALES.filter((m: any) => m.code !== 'en').filter((m: any) => {
+    const c = strings.catalogueFor(m.code)
+    const en = strings.catalogueFor('en')
+    return keys.every((k: string) => c[k] === en[k])
+  })
+  check('no locale is a copy of English', untranslated.length, 0)
+
+  section('i18n — locale resolution')
+  check('exact code', locales.resolveLocale('si').code, 'si')
+  check('region tag narrows to base', locales.resolveLocale('si-LK').code, 'si')
+  check('case insensitive', locales.resolveLocale('DE').code, 'de')
+  check('unknown falls back to English', locales.resolveLocale('klingon').code, 'en')
+  check('undefined falls back to English', locales.resolveLocale(undefined).code, 'en')
+  check('sinhala carries its script', locales.resolveLocale('si').script, 'sinhala')
+  check('french is latin script', locales.resolveLocale('fr').script, 'latin')
+
+  section('i18n — label tokens')
+  check('English label', binding.interpolate('{{@t.billTo}}', scope, { locale: 'en' }), 'BILL TO')
+  check('Sinhala label', binding.interpolate('{{@t.billTo}}', scope, { locale: 'si' }), 'බිල් කරන්නේ')
+  check('Tamil label', binding.interpolate('{{@t.subtotal}}', scope, { locale: 'ta' }), 'கூட்டுத்தொகை')
+  check('German label', binding.interpolate('{{@t.total}}', scope, { locale: 'de' }), 'Gesamt')
+  check('French label', binding.interpolate('{{@t.invoice}}', scope, { locale: 'fr' }), 'FACTURE')
+  check(
+    'label mixed with data',
+    binding.interpolate('{{@t.issued}} {{invoice.number}}', scope, { locale: 'es' }),
+    'Emitido el INV-1001',
+  )
+  check(
+    'unknown label key shows itself rather than blank',
+    binding.interpolate('{{@t.nopeKey}}', scope, { locale: 'en' }),
+    'nopeKey',
+  )
+
+  section('i18n — locale-aware formatting')
+  const money = (locale: string) =>
+    binding.interpolate('{{invoice.total | number}}', scope, { locale })
+  check('English groups with commas', money('en'), '55,000')
+  check('German groups with dots', money('de'), '55.000')
+  check('French uses a space separator', money('fr').replace(/ | /g, ' '), '55 000')
+  const dateEn = binding.interpolate('{{invoice.dueDate | date}}', scope, { locale: 'en' })
+  const dateDe = binding.interpolate('{{invoice.dueDate | date}}', scope, { locale: 'de' })
+  check('dates differ by locale', dateEn !== dateDe, true)
+  check('English date shape', dateEn, 'Aug 30, 2026')
+
+  section('i18n — Sinhala uses Gregorian month names')
+  // ICU's si-LK data returns the traditional Buddhist lunar months (නිකිණි for
+  // August) at every width. Correct for a calendar, wrong on an invoice.
+  const fmt = await server.ssrLoadModule('/src/utils/format.ts')
+  check('August is අගෝස්තු, not නිකිණි', fmt.formatDate('2026-08-14', 'medium', 'si'), '2026 අගෝස්තු 14')
+  check('January', fmt.formatDate('2026-01-14', 'medium', 'si'), '2026 ජනවාරි 14')
+  check('September', fmt.formatDate('2026-09-13', 'medium', 'si'), '2026 සැප්තැම්බර් 13')
+  check('December', fmt.formatDate('2026-12-01', 'medium', 'si'), '2026 දෙසැම්බර් 1')
+  const lunar = ['දුරුතු', 'නවම්', 'මැදින්', 'බක්', 'වෙසක්', 'පොසොන්', 'ඇසළ', 'නිකිණි', 'බිනර', 'වප්', 'ඉල්', 'උඳුවප්']
+  const leaked = [...Array(12).keys()]
+    .map((m) => fmt.formatDate(`2026-${String(m + 1).padStart(2, '0')}-15`, 'medium', 'si'))
+    .filter((s: string) => lunar.some((l) => s.includes(l)))
+  check('no lunar month name survives in any month', leaked, [])
+  check('other locales unaffected', fmt.formatDate('2026-08-14', 'medium', 'en'), 'Aug 14, 2026')
+  check('Tamil keeps ICU Gregorian', fmt.formatDate('2026-08-14', 'medium', 'ta'), '14 ஆக., 2026')
+
+  section('i18n — document rendering')
+  const siInvoice = builtin.BUILT_IN_TEMPLATES.find((t: any) => t.id === 'invoice-modern')
+  const invoiceSi = resolver.resolveDocument(siInvoice, sample.DEFAULT_TEST_DATA, {
+    mode: 'print',
+    locale: 'si',
+  })
+  const siText = invoiceSi.nodes.map((n: any) => n.text).filter(Boolean).join(' ')
+  check('doc reports its locale', invoiceSi.locale, 'si')
+  check('doc reports its script', invoiceSi.script, 'sinhala')
+  check('doc reports direction', invoiceSi.direction, 'ltr')
+  check('Sinhala invoice title rendered', siText.includes('ඉන්වොයිසිය'), true)
+  check('Sinhala bill-to rendered', siText.includes('බිල් කරන්නේ'), true)
+  check('customer data is not translated', siText.includes('John Doe'), true)
+  check('label tokens never counted as missing bindings', invoiceSi.missingBindings.length, 0)
+  const siTable = invoiceSi.nodes.find((n: any) => n.table)
+  check('Sinhala table header', siTable?.table.columns[0].header, 'අයිතමය')
+  check('literal payment method translated', invoiceSi.nodes.some((n: any) =>
+    n.keyValue?.some((r: any) => r.value === 'බැංකු හුවමාරුව')), true)
+
+  section('i18n — every template in every locale')
+  const allSpecs = builtin.BUILT_IN_TEMPLATES
+  const broken: string[] = []
+  for (const meta of locales.LOCALES) {
+    for (const template of allSpecs) {
+      const d = resolver.resolveDocument(template, sample.DEFAULT_TEST_DATA, {
+        mode: 'print',
+        locale: meta.code,
+      })
+      const text = d.nodes.map((n: any) => n.text).filter(Boolean).join(' ')
+      if (text.includes('{{')) broken.push(`${template.id}/${meta.code}: unresolved token`)
+      if (d.missingBindings.length) broken.push(`${template.id}/${meta.code}: missing bindings`)
+      if (!d.nodes.length) broken.push(`${template.id}/${meta.code}: no nodes`)
+    }
+  }
+  // Also assert the sweep is not vacuously passing over an empty catalogue.
+  check(
+    'sweep covered every template and locale',
+    allSpecs.length * locales.LOCALES.length,
+    26 * 7,
+  )
+  check(
+    `${allSpecs.length} templates x ${locales.LOCALES.length} locales all resolve cleanly`,
+    broken.slice(0, 4),
+    [],
+  )
+
+  // Sinhala and Tamil must actually differ from English on every template, or a
+  // template is quietly rendering hardcoded English labels.
+  const untranslatedTemplates: string[] = []
+  for (const template of allSpecs) {
+    const textFor = (locale: string) =>
+      resolver
+        .resolveDocument(template, sample.DEFAULT_TEST_DATA, { mode: 'print', locale })
+        .nodes.map((n: any) => n.text)
+        .filter(Boolean)
+        .join(' ')
+    if (textFor('en') === textFor('si')) untranslatedTemplates.push(template.id)
+  }
+  check('every template changes with locale', untranslatedTemplates, [])
 
   section('Same data, different design')
   const designA = { ...template, elements: [{ ...factory.createElement('text'), content: '{{customer.name}}' }] }
