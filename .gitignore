@@ -10,3 +10,10 @@ dist-ssr
 !.env.example
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Design source, kept local
+ReportForge UI mockups/
+
+# Server build output
+dist-server
+

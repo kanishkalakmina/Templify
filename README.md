@@ -57,7 +57,39 @@ Planning documents live in [`docs/`](docs/):
 
 ---
 
-## Running the project
+## Running it
+
+### With Docker — the real thing
+
+One image, one port, one volume. The editor UI and the render API are served together.
+
+```bash
+docker compose up -d
+```
+
+Or without compose:
+
+```bash
+docker run -d -p 8080:8080 -v templify:/data --shm-size=512m templify/report-server
+```
+
+Open <http://localhost:8080> for the editor, and POST to
+`http://localhost:8080/api/reports/render` from your application. Templates persist to the
+`/data` volume and are **shared by everyone using the instance** — which is what makes them
+addressable by a `templateId` from your code.
+
+`--shm-size` matters: Chromium crashes on larger documents with Docker's default 64 MB of
+shared memory.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `PORT` | `8080` | Listen port |
+| `TEMPLIFY_DATA_DIR` | `/data` | Where templates persist — mount this |
+| `TEMPLIFY_API_KEY` | *(unset)* | When set, `/api/*` requires `Authorization: Bearer <key>` |
+| `TEMPLIFY_RENDER_TIMEOUT_MS` | `30000` | Ceiling on a single render |
+| `TEMPLIFY_STATIC_DIR` | `/app/public` | Built frontend assets |
+
+### Without Docker — frontend only
 
 Requires **Node 20+** (developed against Node 24.19.0 LTS via [nvs](https://github.com/jasongin/nvs)).
 
@@ -66,8 +98,16 @@ npm install
 npm run dev
 ```
 
-Then open <http://localhost:5173>. **No backend is required** — everything runs in the
-browser and persists to `localStorage`.
+Then open <http://localhost:5173>. **No backend is required.** The app probes its own origin
+for a report server at boot; finding none, it falls back to `localStorage`. Everything works
+except the parts that genuinely need a server: templates are per-browser rather than shared,
+and there is no PDF rendering. The sidebar says which mode you are in rather than pretending.
+
+To run the server locally without Docker:
+
+```bash
+npm run build:all && TEMPLIFY_DATA_DIR=./.data TEMPLIFY_STATIC_DIR=./dist npm start
+```
 
 | Script | What it does |
 | --- | --- |
@@ -75,6 +115,8 @@ browser and persists to `localStorage`.
 | `npm run build` | Type-check, then build to `dist/` |
 | `npm run preview` | Serve the production build |
 | `npm run typecheck` | Types only |
+| `npm run build:all` | Frontend + server bundle |
+| `npm start` | Run the built server |
 | `npm run verify` | Runtime checks over the domain layer (56) |
 | `npm run verify:render` | Renders every screen and component (40) |
 
@@ -108,6 +150,7 @@ what allows the identical modules to run inside the Node render server later. It
 enforceable by grep, and `npm run verify` executes those modules outside React to prove it.
 
 ```
+server/          Report server — API, storage, PDF. Imports src/ unchanged.
 src/
 ├── types/       Schema. The contract. No imports.
 ├── services/    Pure domain logic. No React, no DOM.
@@ -322,14 +365,7 @@ collision so an import can never overwrite an existing template.
 
 ---
 
-## The future Docker render server
-
-The prototype is deliberately backend-free. The self-hosted server is the next stage, and
-the frontend is already shaped for it.
-
-```bash
-docker run -d -p 8080:8080 templify/report-server
-```
+## The report server
 
 ```js
 const response = await fetch('http://templify:8080/api/reports/render', {
@@ -337,35 +373,50 @@ const response = await fetch('http://templify:8080/api/reports/render', {
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ templateId: 'invoice-modern', data: invoiceData }),
 })
+// -> application/pdf
 ```
 
 ```
 POST   /api/reports/render      Render a document from templateId + data
+GET    /api/health              Status, version, PDF availability
 GET    /api/templates           List templates
-POST   /api/templates           Create
-GET    /api/templates/:id       Fetch (accepts :id or id:vN)
+POST   /api/templates           Create (409 if the id is taken)
+GET    /api/templates/:id       Fetch — accepts `id` or `id:vN`
 PUT    /api/templates/:id       Update
 DELETE /api/templates/:id       Delete
 ```
 
-**How it plugs in.** Every read and write already goes through the `TemplateRepository`
-port. Swapping storage for the server is a constructor argument, not a refactor — and the
-port is asynchronous today *specifically* so that stays true:
+`options.format: "html"` returns the document as HTML instead of PDF — useful for debugging
+a template without a PDF viewer in the loop.
+
+**Unresolved bindings are always reported**, because that is the integrator's most likely
+failure mode. Every render returns an `X-Templify-Missing-Bindings` header listing paths the
+template referenced but the payload lacked. Send `options.strict: true` to turn that into a
+`422` with the offending paths instead of a document with blank fields.
+
+**How the frontend plugs in.** Every read and write goes through the `TemplateRepository`
+port, and the app picks its implementation at boot by probing `/api/health`:
 
 ```ts
-const repository = import.meta.env.VITE_TEMPLIFY_SERVER
-  ? new HttpTemplateRepository(import.meta.env.VITE_TEMPLIFY_SERVER)
-  : new LocalStorageTemplateRepository(seedTemplates)
+// src/services/repositoryFactory.ts
+const response = await fetch(`${configured}/api/health`)
+return response.ok
+  ? new HttpTemplateRepository(configured)   // shared, API-addressable
+  : new LocalStorageTemplateRepository(seed) // no backend, still works
 ```
 
-The server itself imports `src/types` and `src/services` **unchanged** — the same binding
-engine, the same condition evaluator, the same `resolveDocument` — renders to HTML, and
-converts to PDF with headless Chromium. That reuse is the whole reason the no-React rule on
-those layers is treated as non-negotiable.
+Nothing above that line knows which it got — which is exactly what the port was for.
 
-Self-hosting is a product decision rather than a deployment detail: report payloads contain
-invoices, payslips and audit findings, and keeping rendering inside the customer's network
-removes an entire class of data-residency objection.
+**The server imports `src/types` and `src/services` unchanged**, and renders documents
+through the *same* `resolveDocument` and `ElementRenderer` the editor uses, via
+`renderToStaticMarkup`. A PDF therefore cannot drift from the canvas, because no second
+renderer exists to disagree. That reuse is the entire reason the no-React rule on those
+layers was treated as non-negotiable.
+
+Fonts are installed into the image rather than fetched, so output is identical on a host
+with no internet access. Self-hosting is a product decision, not a deployment detail: report
+payloads contain invoices, payslips and audit findings, and keeping rendering inside the
+customer's network removes an entire class of data-residency objection.
 
 ---
 

@@ -15,7 +15,11 @@ export function SettingsPage() {
   const branding = useSettingsStore((s) => s.branding)
   const updateBranding = useSettingsStore((s) => s.updateBranding)
   const templates = useTemplateStore((s) => s.templates)
+  const mode = useTemplateStore((s) => s.mode)
+  const serverUrl = useTemplateStore((s) => s.serverUrl)
+  const serverInfo = useTemplateStore((s) => s.serverInfo)
   const toast = useUiStore((s) => s.toast)
+  const connected = mode === 'server'
 
   const used = storageFootprintBytes()
   const usedKb = Math.max(1, Math.round(used / 1024))
@@ -50,19 +54,38 @@ export function SettingsPage() {
 
           <div className="mt-[14px] flex flex-col gap-[9px]">
             <InfoRow label="Server status">
-              <span className="font-mono text-[11.5px] font-medium text-ok">● {SERVER.status}</span>
+              {connected ? (
+                <span className="font-mono text-[11.5px] font-medium text-ok">● Running</span>
+              ) : (
+                <span className="font-mono text-[11.5px] font-medium text-faint">● Not connected</span>
+              )}
             </InfoRow>
             <InfoRow label="Server URL">
-              <span className="font-mono text-[11.5px] text-accent-link">{SERVER.url}</span>
+              <span className="font-mono text-[11.5px] text-accent-link">
+                {connected ? serverUrl : '—'}
+              </span>
             </InfoRow>
             <InfoRow label="Version">
-              <span className="font-mono text-[11.5px] text-ink-2">{SERVER.version}</span>
+              <span className="font-mono text-[11.5px] text-ink-2">
+                {serverInfo?.version ?? '—'}
+              </span>
+            </InfoRow>
+            <InfoRow label="PDF renderer">
+              <span
+                className={`font-mono text-[11.5px] ${serverInfo?.pdf ? 'text-ok' : 'text-warn'}`}
+              >
+                {connected ? (serverInfo?.pdf ? 'available' : 'unavailable') : '—'}
+              </span>
+            </InfoRow>
+            <InfoRow label="API auth">
+              <span className="font-mono text-[11.5px] text-ink-2">{serverInfo?.auth ?? '—'}</span>
             </InfoRow>
           </div>
 
           <div className="mt-[14px] border-t border-line pt-[14px] text-[11px] leading-relaxed text-faint">
-            This panel is a UI representation. The prototype does not control Docker — and should
-            not, since a browser has no business holding daemon credentials.
+            {connected
+              ? 'Templates are stored on the server and shared by everyone using this instance. Your application can fetch and render them over the API.'
+              : 'No report server detected, so templates are stored in this browser only — not shared, and not reachable by your application. Run the container above to change that.'}
           </div>
         </div>
 
@@ -102,8 +125,9 @@ export function SettingsPage() {
       <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
         <div className="text-[13px] font-semibold">Workspace storage</div>
         <div className="mt-[6px] text-[12px] leading-relaxed text-muted">
-          Templates persist in this browser. Uploaded logos are embedded as data URLs and dominate
-          the footprint — export a template to keep a durable copy.
+          {connected
+            ? 'Templates persist on the server volume. The figure below is this browser’s local cache only.'
+            : 'Templates persist in this browser. Uploaded logos are embedded as data URLs and dominate the footprint — export a template to keep a durable copy.'}
         </div>
 
         <div className="mt-3 flex items-center gap-3">

@@ -1,0 +1,18 @@
+node_modules
+dist
+dist-server
+.data
+.git
+.gitignore
+.claude
+bmad
+docs
+*.md
+!README.md
+*.tsbuildinfo
+*.log
+.env
+.env.*
+ReportForge UI mockups
+Dockerfile
+docker-compose.yml

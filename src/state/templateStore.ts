@@ -8,10 +8,13 @@
 
 import { create } from 'zustand'
 import type { ReportTemplate, TemplateCategory } from '@/types/template'
+import type { TemplateRepository } from '@/services/templateRepository'
 import {
-  LocalStorageTemplateRepository,
-  type TemplateRepository,
-} from '@/services/templateRepository'
+  createRepository,
+  type RepositoryBinding,
+  type ServerInfo,
+  type StorageMode,
+} from '@/services/repositoryFactory'
 import {
   createBlankTemplate,
   duplicateTemplate,
@@ -24,12 +27,34 @@ import { seedTemplates } from '@/templates/seed'
 import { toast } from './uiStore'
 import { useSettingsStore } from './settingsStore'
 
-const repository: TemplateRepository = new LocalStorageTemplateRepository(seedTemplates)
+/**
+ * The repository is resolved once, on first use: a report server if one answers
+ * on this origin, browser storage otherwise. Everything below is written against
+ * the port, so neither this store nor any screen knows which it got.
+ */
+let binding: RepositoryBinding | null = null
+let bindingPromise: Promise<RepositoryBinding> | null = null
+
+async function bind(): Promise<RepositoryBinding> {
+  if (binding) return binding
+  if (!bindingPromise) bindingPromise = createRepository(seedTemplates)
+  binding = await bindingPromise
+  return binding
+}
+
+async function repo(): Promise<TemplateRepository> {
+  return (await bind()).repository
+}
 
 interface TemplateState {
   templates: ReportTemplate[]
   builtIns: ReportTemplate[]
   loaded: boolean
+
+  /** Where templates actually live, decided at boot. */
+  mode: StorageMode
+  serverUrl: string
+  serverInfo: ServerInfo | null
 
   hydrate: () => Promise<void>
 
@@ -74,10 +99,33 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   templates: [],
   builtIns: BUILT_IN_TEMPLATES,
   loaded: false,
+  mode: 'local',
+  serverUrl: '',
+  serverInfo: null,
 
   hydrate: async () => {
-    const templates = await repository.list()
-    set({ templates, loaded: true })
+    const resolved = await bind()
+    try {
+      const templates = await resolved.repository.list()
+      set({
+        templates,
+        loaded: true,
+        mode: resolved.mode,
+        serverUrl: resolved.serverUrl,
+        serverInfo: resolved.info,
+      })
+    } catch (error) {
+      // A server that answered /api/health but then failed should not leave the
+      // app blank — surface it and carry on with an empty catalogue.
+      console.error('[templates] Failed to load from server:', error)
+      set({ templates: [], loaded: true, mode: resolved.mode, serverUrl: resolved.serverUrl, serverInfo: resolved.info })
+      toast({
+        title: 'Could not load templates',
+        description: 'The report server responded but returned an error.',
+        tone: 'danger',
+        duration: 6000,
+      })
+    }
   },
 
   getById: (id) => get().templates.find((t) => t.id === id),
@@ -96,7 +144,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     // New templates inherit the workspace branding defaults from Settings.
     const blank = createBlankTemplate(input)
     const template = { ...blank, branding: { ...useSettingsStore.getState().branding } }
-    const result = await repository.save(template)
+    const result = await (await repo()).save(template)
     reportWriteFailure(result)
     set((state) => ({ templates: [...state.templates, template] }))
     return template
@@ -106,7 +154,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const source = get().resolve(sourceId)
     if (!source) return undefined
     const copy = duplicateTemplate(source, { id, name })
-    const result = await repository.save(copy)
+    const result = await (await repo()).save(copy)
     reportWriteFailure(result)
     set((state) => ({ templates: [...state.templates, copy] }))
     return copy
@@ -116,14 +164,14 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const source = get().getById(id) ?? get().builtIns.find((t) => t.id === id)
     if (!source) return undefined
     const copy = duplicateTemplate(source, { id: newId, name: newName })
-    const result = await repository.save(copy)
+    const result = await (await repo()).save(copy)
     reportWriteFailure(result)
     set((state) => ({ templates: [...state.templates, copy] }))
     return copy
   },
 
   importTemplate: async (template) => {
-    const result = await repository.save(template)
+    const result = await (await repo()).save(template)
     reportWriteFailure(result)
     set((state) => ({ templates: [...state.templates, template] }))
     return template
@@ -142,13 +190,13 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       category: (patch.category ?? current.category) as TemplateCategory,
       updatedAt: new Date().toISOString(),
     }
-    const result = await repository.save(next)
+    const result = await (await repo()).save(next)
     reportWriteFailure(result)
     set((state) => ({ templates: state.templates.map((t) => (t.id === id ? next : t)) }))
   },
 
   remove: async (id) => {
-    const result = await repository.remove(id)
+    const result = await (await repo()).remove(id)
     reportWriteFailure(result)
     set((state) => ({ templates: state.templates.filter((t) => t.id !== id) }))
   },
@@ -157,7 +205,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const current = get().getById(id)
     if (!current) return
     const next = { ...current, archived, updatedAt: new Date().toISOString() }
-    const result = await repository.save(next)
+    const result = await (await repo()).save(next)
     reportWriteFailure(result)
     set((state) => ({ templates: state.templates.map((t) => (t.id === id ? next : t)) }))
   },
@@ -176,7 +224,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
         ? createVersion(template, note)
         : { ...template, updatedAt: new Date().toISOString() }
 
-    const result = await repository.save(next)
+    const result = await (await repo()).save(next)
     reportWriteFailure(result)
 
     set((state) => ({
@@ -193,7 +241,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     if (!current) return undefined
     const restored = restoreVersion(current, version)
     if (!restored) return undefined
-    const result = await repository.save(restored)
+    const result = await (await repo()).save(restored)
     reportWriteFailure(result)
     set((state) => ({ templates: state.templates.map((t) => (t.id === id ? restored : t)) }))
     return restored

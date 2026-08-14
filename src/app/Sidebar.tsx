@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/utils/cn'
 import { SERVER } from '@/data/server'
+import { useTemplateStore } from '@/state/templateStore'
 
 const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -51,15 +52,39 @@ export function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-2 rounded-xl border border-line bg-panel p-[10px]">
-        <div className="flex items-center gap-[7px] text-[11px] font-medium text-muted">
-          <span className="h-[6px] w-[6px] rounded-full bg-ok shadow-[0_0_0_3px_rgba(63,214,140,.15)]" />
-          Server running
-        </div>
-        <div className="font-mono text-[10.5px] text-faint">
-          {SERVER.host} · v{SERVER.version}
-        </div>
-      </div>
+      <ServerStatusCard />
     </aside>
+  )
+}
+
+/** Reflects the real connection, rather than always claiming a server is up. */
+function ServerStatusCard() {
+  const mode = useTemplateStore((s) => s.mode)
+  const serverUrl = useTemplateStore((s) => s.serverUrl)
+  const info = useTemplateStore((s) => s.serverInfo)
+
+  const connected = mode === 'server'
+  const host = serverUrl.replace(/^https?:\/\//, '') || SERVER.host
+
+  return (
+    <div className="mt-auto flex flex-col gap-2 rounded-xl border border-line bg-panel p-[10px]">
+      <div className="flex items-center gap-[7px] text-[11px] font-medium text-muted">
+        <span
+          className={cn(
+            'h-[6px] w-[6px] rounded-full',
+            connected
+              ? 'bg-ok shadow-[0_0_0_3px_rgba(63,214,140,.15)]'
+              : 'bg-faint shadow-[0_0_0_3px_rgba(104,113,126,.15)]',
+          )}
+        />
+        {connected ? 'Server connected' : 'Browser storage'}
+      </div>
+      <div className="font-mono text-[10.5px] leading-relaxed text-faint">
+        {connected ? `${host} · v${info?.version ?? SERVER.version}` : 'No report server — local only'}
+      </div>
+      {connected && info && !info.pdf ? (
+        <div className="text-[10px] leading-snug text-warn">PDF renderer unavailable</div>
+      ) : null}
+    </div>
   )
 }
