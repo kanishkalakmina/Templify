@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    @apply bg-app text-ink font-sans antialiased;
+    font-size: 13px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #252b33;
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid #5b7cfa;
+    outline-offset: 1px;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-family: inherit;
+  }
+}
+
+@layer components {
+  /*
+   * The printable document surface.
+   *
+   * Isolated from the application's dark tokens on purpose: a report must render
+   * identically outside this app — in a thumbnail, in preview, and eventually in
+   * a headless browser that never loaded this stylesheet. Every document style
+   * is computed inline from the template schema. See architecture NFR-008.
+   */
+  .doc-surface {
+    color-scheme: light;
+    background: #ffffff;
+  }
+}

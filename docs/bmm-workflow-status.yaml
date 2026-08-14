@@ -1,0 +1,89 @@
+# BMAD Method Workflow Status
+# Generated: 2026-08-14T17:48:51Z
+# Project: Templify
+
+project_name: "Templify"
+project_type: "web-app"
+project_level: 3
+communication_language: "English"
+output_language: "English"
+last_updated: "2026-08-14T17:48:51Z"
+
+# Implementation is split by the R-1 blocker in the architecture doc:
+#   Track A (unblocked) — schema, domain services, state stores, persistence
+#   Track B (blocked)   — design system, shell, pages, editor UI, document layouts
+implementation_tracks:
+  track_a: "complete"   # schema, domain services, state, persistence — 56/56 checks
+  track_b: "complete"   # design system, shell, screens, editor, 26 built-in layouts — 40/40 checks
+
+# Workflow Status Tracking
+# Status values:
+#   - "required" - Must be completed
+#   - "optional" - Can be skipped
+#   - "recommended" - Strongly suggested
+#   - "conditional" - Required based on project level
+#   - "{file-path}" - Completed (path to output file)
+#   - "skipped" - Explicitly skipped
+
+workflow_status:
+  # Phase 1: Analysis (Optional but recommended)
+  - name: product-brief
+    phase: 1
+    status: "skipped"
+    description: "Create comprehensive product brief"
+    note: "Superseded by a user-authored product specification. See docs/product-spec-templify.md."
+
+  - name: brainstorm-project
+    phase: 1
+    status: "skipped"
+    description: "Structured brainstorming session"
+    note: "Product concept arrived fully formed from the stakeholder."
+
+  - name: research
+    phase: 1
+    status: "optional"
+    description: "Market and competitive research"
+
+  # Phase 2: Planning (Required - choose one based on project level)
+  - name: prd
+    phase: 2
+    status: "docs/product-spec-templify.md"
+    description: "Product Requirements Document"
+    note: >
+      Requirements were authored directly by the stakeholder as a 39-section brief,
+      including the TypeScript template schema. Captured verbatim in structure as the
+      project PRD rather than re-derived.
+
+  - name: tech-spec
+    phase: 2
+    status: "optional"
+    description: "Technical Specification"
+    note: "Stack and schema are fixed by the PRD; architecture doc carries the remaining detail."
+
+  - name: create-ux-design
+    phase: 2
+    status: "ReportForge UI mockups/"
+    description: "UX/UI design workflow"
+    note: >
+      Satisfied externally. The stakeholder supplied a high-fidelity DevCanvas mock
+      covering the dark application chrome, all eight screens, four modals and the
+      printable document layouts. Implemented as delivered; the app is named Templify
+      per the brief while keeping the mock's visual design.
+
+  # Phase 3: Solutioning (Conditional on project level)
+  - name: architecture
+    phase: 3
+    status: "docs/architecture-templify-2026-08-14.md"
+    description: "System architecture design"
+    note: >
+      Enterprise sections (auth, HA/DR, scaling, CI/CD) are scoped as [Future] — the
+      deliverable is a backend-free prototype. The seams that make the Docker render
+      server droppable-in are specified instead.
+
+  - name: solutioning-gate-check
+    phase: 3
+    status: "optional"
+    description: "Validate architecture against requirements"
+
+# Phase 4: Implementation (Required)
+# Note: Implementation tracked in sprint-status.yaml
