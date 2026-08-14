@@ -177,6 +177,35 @@ export function ApiPage() {
       </div>
 
       <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
+        <div className="text-[13px] font-semibold">Missing data</div>
+        <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
+          A payload that omits a path the template references is the most likely way an
+          integration goes wrong quietly. Every render returns{' '}
+          <span className="font-mono text-accent-link">X-Templify-Missing-Bindings</span> listing
+          them. Send <span className="font-mono text-accent-link">{'"strict": true'}</span> in{' '}
+          <span className="font-mono text-accent-link">options</span> to get a{' '}
+          <span className="font-mono text-accent-link">422</span> naming the offending paths
+          instead of a document with blank fields.
+        </div>
+        <pre className="mt-3 overflow-auto rounded-lg border border-line bg-app p-3 font-mono text-[11px] leading-[1.65] text-ink-3">{`422 Unprocessable Entity
+{
+  "error": "missing_bindings",
+  "templateId": "invoice-modern",
+  "missing": ["customer.vatNumber", "invoice.poNumber"]
+}`}</pre>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
+        <div className="text-[13px] font-semibold">HTML output</div>
+        <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
+          Send <span className="font-mono text-accent-link">{'"format": "html"'}</span> in{' '}
+          <span className="font-mono text-accent-link">options</span> to get the document as HTML
+          rather than PDF — the same markup Chromium is given, which makes template problems far
+          easier to inspect than a binary.
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
         <div className="text-[13px] font-semibold">Version pinning</div>
         <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
           Send <span className="font-mono text-accent-link">invoice-modern</span> to always render
