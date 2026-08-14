@@ -67,10 +67,10 @@ One image, one port, one volume. The editor UI and the render API are served tog
 docker compose up -d
 ```
 
-Or without compose:
+Or pull the published image — no build needed:
 
 ```bash
-docker run -d -p 8080:8080 -v templify:/data --shm-size=512m templify/report-server
+docker run -d -p 8080:8080 -v templify:/data --shm-size=512m ghcr.io/kanishkalakmina/templify:latest
 ```
 
 Open <http://localhost:8080> for the editor, and POST to

@@ -7,6 +7,8 @@
 
 services:
   templify:
+    # Comment `build` out to pull the published image instead of building:
+    #   image: ghcr.io/kanishkalakmina/templify:latest
     build: .
     image: templify/report-server:1.0.0
     container_name: templify

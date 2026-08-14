@@ -1,0 +1,116 @@
+# Publishes the Templify report server image to GitHub Container Registry.
+#
+# Triggered by pushing a version tag:
+#
+#   git tag -a v1.0.0 -m "Templify 1.0.0" && git push origin v1.0.0
+#
+# Afterwards anyone can run the release without building it themselves:
+#
+#   docker run -d -p 8080:8080 -v templify:/data --shm-size=512m \
+#     ghcr.io/kanishkalakmina/templify:1.0.0
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  # Allows a manual re-run against an existing tag if a publish fails.
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/templify
+
+jobs:
+  # Never publish an image that fails its own checks.
+  verify:
+    name: Type check and verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Chromium is only needed by the server at runtime, not to install deps.
+      - run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      # `build:all` runs `tsc -b` across the app, node and server projects.
+      - run: npm run build:all
+
+      - name: Domain checks
+        run: npm run verify
+
+      - name: Render checks
+        run: npm run verify:render
+
+  image:
+    name: Build and push image
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        name: Derive tags
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # v1.2.3 publishes 1.2.3, 1.2, 1 and latest.
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=Templify
+            org.opencontainers.image.description=Self-hosted report template platform — your app owns the data, Templify owns the document design
+            org.opencontainers.image.licenses=MIT
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # amd64 only, deliberately. An arm64 build has to emulate `apt-get
+          # install chromium` and a full npm build under QEMU, which turns a
+          # four-minute job into most of an hour. Add `,linux/arm64` here if you
+          # need Apple Silicon or Raspberry Pi images and can accept that.
+          platforms: linux/amd64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          {
+            echo "### Published"
+            echo
+            echo '```'
+            echo "${{ steps.meta.outputs.tags }}"
+            echo '```'
+            echo
+            echo "Run it:"
+            echo
+            echo '```bash'
+            echo "docker run -d -p 8080:8080 -v templify:/data --shm-size=512m ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
