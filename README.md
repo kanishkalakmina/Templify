@@ -32,7 +32,8 @@ Developer → code → build → deploy    Design change
 
 ## Status
 
-Complete and verified. Built to the approved UI mock in `ReportForge UI mockups/`.
+Complete and verified. Built to a stakeholder-approved UI mock (kept out of version
+control — it is a design source, not a build input).
 
 | Area | State |
 | --- | --- |
@@ -49,11 +50,10 @@ Planning documents live in [`docs/`](docs/):
 - [`architecture-templify-2026-08-14.md`](docs/architecture-templify-2026-08-14.md) — architecture, decisions, trade-offs
 - [`bmm-workflow-status.yaml`](docs/bmm-workflow-status.yaml) — BMAD workflow state
 
-> **Naming.** The mock is titled *ReportForge*; the brief's closing instruction was that the
-> app is **Templify**, so that is the name used throughout — including the Docker image
-> (`templify/report-server`), the internal host (`http://templify:8080`) and the API key
-> prefix (`tf_live_`). The visual design is the mock's, unchanged. Say the word and it
-> renames in one pass.
+> **Naming.** The product is **Templify** throughout — the app, the Docker image
+> (`templify/report-server`), the internal host (`http://templify:8080`), the API key prefix
+> (`tf_live_`) and the `.templify` export format. The design mock carried an earlier working
+> title; the visual design is the mock's, the name is not.
 
 ---
 

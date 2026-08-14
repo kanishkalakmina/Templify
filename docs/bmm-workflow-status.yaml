@@ -62,13 +62,14 @@ workflow_status:
 
   - name: create-ux-design
     phase: 2
-    status: "ReportForge UI mockups/"
+    status: "external-mock"
     description: "UX/UI design workflow"
     note: >
       Satisfied externally. The stakeholder supplied a high-fidelity DevCanvas mock
       covering the dark application chrome, all eight screens, four modals and the
-      printable document layouts. Implemented as delivered; the app is named Templify
-      per the brief while keeping the mock's visual design.
+      printable document layouts. Implemented as delivered. The mock files are kept
+      out of version control as a design source. Product name is Templify, confirmed
+      by the stakeholder; the mock's earlier working title was not carried over.
 
   # Phase 3: Solutioning (Conditional on project level)
   - name: architecture
