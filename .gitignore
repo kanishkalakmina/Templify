@@ -17,3 +17,7 @@ ReportForge UI mockups/
 # Server build output
 dist-server
 
+
+# Local server data (dev)
+.data
+
