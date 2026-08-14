@@ -400,6 +400,14 @@ function resolveText(element: TemplateElement, scope: BindingScope, ctx: Resolve
     return ctx.mode === 'edit' ? element.dataBinding : ''
   }
 
+  // A KPI carries its value in props, not in `content`, so it needs resolving
+  // here or the card renders with a label and nothing under it.
+  if (element.type === 'kpi') {
+    const kpi = element.props?.kpi
+    if (kpi?.value) return resolveField(kpi.value, scope, kpi.format, ctx)
+    return ''
+  }
+
   if (element.type === 'pageNumber') {
     const format = element.props?.pageNumber?.format ?? 'Page {n} of {total}'
     // Single-page prototype: pagination is a server-render concern (see R-6).

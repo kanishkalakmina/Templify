@@ -392,6 +392,9 @@ function Chart({ node }: { node: ResolvedNode }) {
             key={index}
             style={{
               flex: 1,
+              // Capped so a series of two or three points reads as a chart
+              // rather than as full-width slabs.
+              maxWidth: 56,
               height: `${Math.max(2, pct)}%`,
               background: accent,
               opacity: 0.35 + pct / 200,

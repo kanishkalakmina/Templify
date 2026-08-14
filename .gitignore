@@ -27,3 +27,8 @@ invoice-test.pdf
 invoice-page-*.png
 invoice-text.txt
 
+chk-*.pdf
+chk-*.png
+invoice-fixed*
+topng.sh
+

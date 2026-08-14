@@ -45,6 +45,7 @@ try {
   const resolver = await server.ssrLoadModule('/src/services/resolveDocument.ts')
   const factory = await server.ssrLoadModule('/src/services/elementFactory.ts')
   const sample = await server.ssrLoadModule('/src/data/sampleData.ts')
+  const builtinLayouts = await server.ssrLoadModule('/src/templates/builtin/layouts.ts')
 
   const data = sample.DEFAULT_TEST_DATA
   const scope = binding.rootScope(data)
@@ -225,6 +226,19 @@ try {
     literalEdit.nodes[0].keyValue[4].value,
     '{{invoice.nope}}',
   )
+
+  section('Report elements')
+  // Regression: a KPI holds its value in props rather than `content`, so it was
+  // rendering as a label with nothing under it.
+  const reportTemplate = { ...template, elements: builtinLayouts.reportLayout({ accent: '#9F1239' }) }
+  const reportDoc = resolver.resolveDocument(reportTemplate, data, { mode: 'print' })
+  const kpis = reportDoc.nodes.filter((n: any) => n.type === 'kpi')
+  check('report has three KPI cards', kpis.length, 3)
+  check('KPI renders its bound value', kpis[0].text, '55,000')
+  check('net KPI uses the total', kpis[2].text, '55,000')
+  const chartNode = reportDoc.nodes.find((n: any) => n.type === 'chart')
+  check('chart binds to the data', chartNode?.chart.points.length, 2)
+  check('chart computes a max', chartNode?.chart.max, 50000)
 
   section('Same data, different design')
   const designA = { ...template, elements: [{ ...factory.createElement('text'), content: '{{customer.name}}' }] }
