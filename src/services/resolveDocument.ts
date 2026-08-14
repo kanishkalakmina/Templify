@@ -19,6 +19,7 @@ import type { ReportData } from '@/types/data'
 import type {
   ChartConfig,
   ElementProps,
+  FormatKind,
   ElementStyle,
   ElementType,
   KeyValueConfig,
@@ -29,7 +30,17 @@ import type {
   TextAlign,
 } from '@/types/template'
 import type { BindingScope } from './binding'
-import { interpolate, itemScope, resolveArray, resolvePath, resolveValue, rootScope } from './binding'
+import {
+  hasBinding,
+  interpolate,
+  isSingleToken,
+  itemScope,
+  parseToken,
+  resolveArray,
+  resolvePath,
+  resolveValue,
+  rootScope,
+} from './binding'
 import { evaluateConditions } from './conditions'
 import { formatValue, toNumber } from '@/utils/format'
 import { pageBox } from '@/utils/page'
@@ -335,6 +346,47 @@ function repeatStride(element: TemplateElement, gap: number, direction: 'vertica
 }
 
 /* -------------------------------------------------------------------------- */
+/* Field resolution                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Resolves a field that may hold a token, mixed text, or plain literal text.
+ *
+ * The distinction matters: a table cell or key/value row is *content*, so
+ * "Bank Transfer" is the text to print — not a path to look up. Treating every
+ * non-token string as a path silently blanked any literal an author typed.
+ */
+function resolveField(
+  expression: string | undefined,
+  scope: BindingScope,
+  format: FormatKind,
+  ctx: ResolveContext,
+): string {
+  if (!expression) return ''
+  const trimmed = expression.trim()
+
+  // No bindings at all — literal text, passed through untouched.
+  if (!hasBinding(trimmed)) return trimmed
+
+  // Exactly one token: resolve to the raw value so the column/row format can
+  // apply to a real number or date rather than to its string form.
+  if (isSingleToken(trimmed)) {
+    const { path, format: inline } = parseToken(trimmed.slice(2, -2))
+    trackMissing(trimmed, scope, ctx)
+    const value = resolvePath(scope, path)
+    if (value === undefined || value === null) return ctx.mode === 'edit' ? trimmed : ''
+    return formatValue(value, inline ?? format, ctx.currency)
+  }
+
+  // Literal text with tokens embedded in it.
+  trackMissing(trimmed, scope, ctx)
+  return interpolate(trimmed, scope, {
+    currency: ctx.currency,
+    onMissing: ctx.mode === 'edit' ? 'token' : 'empty',
+  })
+}
+
+/* -------------------------------------------------------------------------- */
 /* Per-type resolution                                                         */
 /* -------------------------------------------------------------------------- */
 
@@ -386,14 +438,9 @@ function resolveTable(element: TemplateElement, scope: BindingScope, ctx: Resolv
     return {
       key: `${element.id}-row-${index}`,
       index,
-      cells: config.columns.map((column) => {
-        trackMissing(column.binding, rowScope, ctx)
-        const value = resolveValue(column.binding, rowScope)
-        if (value === undefined || value === null) {
-          return ctx.mode === 'edit' ? '—' : ''
-        }
-        return formatValue(value, column.format, ctx.currency)
-      }),
+      cells: config.columns.map((column) =>
+        resolveField(column.binding, rowScope, column.format, ctx),
+      ),
     }
   })
 
@@ -423,21 +470,11 @@ function resolveKeyValue(
 ): ResolvedKeyValueRow[] {
   const config: KeyValueConfig | undefined = element.props?.keyValue
   if (!config) return []
-  return config.rows.map((row) => {
-    trackMissing(row.value, scope, ctx)
-    const raw = resolveValue(row.value, scope)
-    const value =
-      raw === undefined || raw === null
-        ? ctx.mode === 'edit'
-          ? row.value
-          : ''
-        : formatValue(raw, row.format, ctx.currency)
-    return {
-      id: row.id,
-      label: interpolate(row.label, scope, { currency: ctx.currency }),
-      value,
-    }
-  })
+  return config.rows.map((row) => ({
+    id: row.id,
+    label: interpolate(row.label, scope, { currency: ctx.currency }),
+    value: resolveField(row.value, scope, row.format, ctx),
+  }))
 }
 
 function resolveList(element: TemplateElement, scope: BindingScope, ctx: ResolveContext): string[] {

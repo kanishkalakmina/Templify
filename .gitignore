@@ -21,3 +21,9 @@ dist-server
 # Local server data (dev)
 .data
 
+
+# Local render test artifacts
+invoice-test.pdf
+invoice-page-*.png
+invoice-text.txt
+

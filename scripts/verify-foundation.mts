@@ -170,6 +170,62 @@ try {
   )
   check('missing bindings reported', missing.missingBindings, ['customer.vatNumber'])
 
+  section('Literal text in data fields')
+  // Regression: a non-token string in a key/value row or table cell is content,
+  // not a data path. Treating it as a path silently blanked it in print.
+  const literalTemplate = {
+    ...template,
+    elements: [
+      {
+        ...factory.createElement('keyValue', { x: 40, y: 40 }),
+        props: {
+          keyValue: {
+            rows: [
+              { id: 'r1', label: 'Method', value: 'Bank Transfer', format: 'text' },
+              { id: 'r2', label: 'Account', value: '**** **** 4021', format: 'text' },
+              { id: 'r3', label: 'Due', value: '{{invoice.dueDate}}', format: 'date' },
+              { id: 'r4', label: 'Ref', value: 'PO {{invoice.number}}', format: 'text' },
+              { id: 'r5', label: 'Missing', value: '{{invoice.nope}}', format: 'text' },
+            ],
+            labelWidth: 50, labelColor: '#999', valueColor: '#111', labelWeight: 400,
+            valueWeight: 500, rowGap: 6, divider: false, dividerColor: '#eee', valueAlign: 'right',
+          },
+        },
+      },
+      {
+        ...factory.createElement('table', { x: 40, y: 200 }),
+        props: {
+          table: {
+            ...factory.createElement('table').props.table,
+            columns: [
+              { id: 'c1', header: 'Item', binding: '{{item.name}}', width: 2, align: 'left', format: 'text' },
+              { id: 'c2', header: 'Unit', binding: 'each', width: 1, align: 'left', format: 'text' },
+              { id: 'c3', header: 'Total', binding: '{{item.total}}', width: 1, align: 'right', format: 'number' },
+            ],
+          },
+        },
+      },
+    ],
+  }
+
+  const literalDoc = resolver.resolveDocument(literalTemplate, data, { mode: 'print' })
+  const kvRows = literalDoc.nodes[0].keyValue
+  check('literal key/value survives', kvRows[0].value, 'Bank Transfer')
+  check('masked literal survives', kvRows[1].value, '**** **** 4021')
+  check('bound date still formats', kvRows[2].value, 'Aug 30, 2026')
+  check('mixed literal and token', kvRows[3].value, 'PO INV-1001')
+  check('missing binding is blank in print', kvRows[4].value, '')
+  const literalTable = literalDoc.nodes[1].table
+  check('literal table cell survives', literalTable.rows[0].cells[1], 'each')
+  check('bound table cell still formats', literalTable.rows[0].cells[2], '50,000')
+
+  const literalEdit = resolver.resolveDocument(literalTemplate, data, { mode: 'edit' })
+  check(
+    'missing binding shows its token while editing',
+    literalEdit.nodes[0].keyValue[4].value,
+    '{{invoice.nope}}',
+  )
+
   section('Same data, different design')
   const designA = { ...template, elements: [{ ...factory.createElement('text'), content: '{{customer.name}}' }] }
   const designB = {
