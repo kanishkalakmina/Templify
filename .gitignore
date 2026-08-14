@@ -32,3 +32,6 @@ chk-*.png
 invoice-fixed*
 topng.sh
 
+
+# BMAD workflow config (local)
+bmad/
