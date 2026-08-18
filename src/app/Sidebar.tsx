@@ -5,6 +5,7 @@ import {
   Library,
   Settings,
   Shuffle,
+  BookOpen,
   LayoutTemplate,
   type LucideIcon,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ const NAV: { to: string; label: string; icon: LucideIcon; end?: boolean }[] = [
   { to: '/demo', label: 'Same Data Demo', icon: Shuffle },
   { to: '/api', label: 'API', icon: Code2 },
   { to: '/settings', label: 'Settings', icon: Settings },
+  { to: '/help', label: 'Help', icon: BookOpen },
 ]
 
 export function Sidebar() {
