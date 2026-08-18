@@ -41,16 +41,17 @@ control — it is a design source, not a build input).
 | Area | State |
 | --- | --- |
 | Schema, binding engine, conditions, resolver, versioning, persistence, import/export | ✅ 56/56 runtime checks |
-| Design system, shell, all eight screens, editor workspace, 26 built-in layouts | ✅ 40/40 render checks |
+| Design system, shell, all nine screens, editor workspace, 26 built-in layouts | ✅ 49/49 render checks |
 | Type check · production build | ✅ clean |
 
 **Screens:** Dashboard · Templates · Template Library · Same Data Demo · API · Settings ·
-Editor · Preview.
+Help · Editor · Preview.
 
 Planning documents live in [`docs/`](docs/):
 
 - [`product-spec-templify.md`](docs/product-spec-templify.md) — requirements (serves as PRD)
 - [`architecture-templify-2026-08-14.md`](docs/architecture-templify-2026-08-14.md) — architecture, decisions, trade-offs
+- [`tech-spec-counter-print.md`](docs/tech-spec-counter-print.md) — **start here to integrate**: payload to popup to paper, with the decisions, the payload contract and the constraints
 - [`bmm-workflow-status.yaml`](docs/bmm-workflow-status.yaml) — BMAD workflow state
 
 > **Naming.** The product is **Templify** throughout — the app, the Docker image
@@ -431,12 +432,18 @@ GET    /api/health              Status, version, PDF availability
 GET    /api/templates           List templates
 POST   /api/templates           Create (409 if the id is taken)
 GET    /api/templates/:id       Fetch — accepts `id` or `id:vN`
-PUT    /api/templates/:id       Update
-DELETE /api/templates/:id       Delete
+PUT    /api/templates/:id       Update — archive with `"archived": true`
 ```
 
 `options.format: "html"` returns the document as HTML instead of PDF — useful for debugging
-a template without a PDF viewer in the loop.
+a template without a PDF viewer in the loop, and the right transport when the destination is
+a printer rather than a file.
+
+**There is no delete.** A `templateId` is a contract: applications post it, and documents
+already issued name it, so removing one would silently break every caller still rendering it.
+`DELETE` returns `405`. Retire a design by archiving it — from the Templates screen, or
+`"archived": true` on a `PUT` — which takes it out of the library while leaving it renderable.
+Genuine removal is an operator action against the `/data` volume.
 
 **Unresolved bindings are always reported**, because that is the integrator's most likely
 failure mode. Every render returns an `X-Templify-Missing-Bindings` header listing paths the
@@ -515,8 +522,9 @@ Next — the known gaps, and the most useful places to help:
 
 Recorded plainly rather than discovered later:
 
-- **PDF download is not implemented.** No renderer exists yet, so the buttons will show a
-  toast rather than emit a fake file.
+- **PDF rendering needs the server.** The Docker image renders real PDFs through headless
+  Chromium. In frontend-only mode there is no renderer, so the download buttons show a toast
+  rather than emit a fake file.
 - **QR codes and barcodes render a visual placeholder**, not a scannable encoding. A code
   that looks real but does not scan would be worse than an obvious placeholder; real
   encoding is a server concern.

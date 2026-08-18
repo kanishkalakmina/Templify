@@ -37,13 +37,14 @@ const CODE = `const response = await fetch(
   }
 );`
 
+/** Every route the server defines. Kept in step with `server/index.ts`. */
 const ENDPOINTS: { method: 'POST' | 'GET' | 'PUT' | 'DELETE'; path: string; desc: string }[] = [
-  { method: 'POST', path: '/api/templates', desc: 'Create a template' },
-  { method: 'GET', path: '/api/templates', desc: 'List templates' },
-  { method: 'GET', path: '/api/templates/:id', desc: 'Fetch one template' },
-  { method: 'PUT', path: '/api/templates/:id', desc: 'Update a template' },
-  { method: 'DELETE', path: '/api/templates/:id', desc: 'Delete a template' },
   { method: 'POST', path: '/api/reports/render', desc: 'Render templateId + data' },
+  { method: 'GET', path: '/api/health', desc: 'Status, version, PDF availability, locales' },
+  { method: 'GET', path: '/api/templates', desc: 'List templates' },
+  { method: 'GET', path: '/api/templates/:id', desc: 'Fetch one — accepts id or id:vN' },
+  { method: 'POST', path: '/api/templates', desc: 'Create a template (409 if the id is taken)' },
+  { method: 'PUT', path: '/api/templates/:id', desc: 'Update — archive with "archived": true' },
 ]
 
 export function ApiPage() {
@@ -103,9 +104,17 @@ export function ApiPage() {
           <div className="min-w-0 flex-1">
             <div className="text-[13px] font-semibold">API keys</div>
             <div className="mt-[6px] text-[12px] leading-relaxed text-muted">
-              Generated here and sent as{' '}
-              <span className="font-mono text-accent-link">Authorization: Bearer …</span> on render
-              calls. Keys live on your server — the full value is shown once, at creation.
+              Sent as{' '}
+              <span className="font-mono text-accent-link">Authorization: Bearer …</span> on every{' '}
+              <span className="font-mono text-accent-link">/api</span> call. The server accepts
+              exactly one value — whatever{' '}
+              <span className="font-mono text-accent-link">TEMPLIFY_API_KEY</span> is set to in
+              its environment — and requires none at all while that is unset.
+            </div>
+            <div className="mt-[6px] text-[12px] leading-relaxed text-faint">
+              Keys generated below show the shape of the flow and are held in memory only. They
+              are never registered with the server, so set the environment variable to turn auth
+              on.
             </div>
           </div>
           <Button
@@ -202,6 +211,27 @@ export function ApiPage() {
           <span className="font-mono text-accent-link">options</span> to get the document as HTML
           rather than PDF — the same markup Chromium is given, which makes template problems far
           easier to inspect than a binary.
+        </div>
+      </div>
+
+      <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
+        <div className="text-[13px] font-semibold">Templates cannot be deleted</div>
+        <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
+          A <span className="font-mono text-accent-link">templateId</span> is a contract: your
+          applications post it, and documents already issued name it. Removing one would
+          silently break every caller still rendering it, so the capability is absent rather
+          than guarded —{' '}
+          <span className="font-mono text-accent-link">DELETE</span> returns{' '}
+          <span className="font-mono text-accent-link">405</span>.
+        </div>
+        <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
+          Retire a design by <strong>archiving</strong> it instead — from the Templates screen,
+          or by sending{' '}
+          <span className="font-mono text-accent-link">{'"archived": true'}</span> on a{' '}
+          <span className="font-mono text-accent-link">PUT</span>. It leaves the library and
+          stops appearing in pickers, but it still renders, so nothing already integrated
+          breaks. Genuine removal is an operator action against the{' '}
+          <span className="font-mono text-accent-link">/data</span> volume.
         </div>
       </div>
 

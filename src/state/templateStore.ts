@@ -74,7 +74,7 @@ interface TemplateState {
     id: string,
     patch: Partial<Pick<ReportTemplate, 'name' | 'description' | 'category'>>,
   ) => Promise<void>
-  remove: (id: string) => Promise<void>
+  /* No `remove`: templates are retired with `setArchived`, never deleted. */
   setArchived: (id: string, archived: boolean) => Promise<void>
 
   /** Persists a design. `newVersion` appends a version entry (what Save does). */
@@ -193,12 +193,6 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
     const result = await (await repo()).save(next)
     reportWriteFailure(result)
     set((state) => ({ templates: state.templates.map((t) => (t.id === id ? next : t)) }))
-  },
-
-  remove: async (id) => {
-    const result = await (await repo()).remove(id)
-    reportWriteFailure(result)
-    set((state) => ({ templates: state.templates.filter((t) => t.id !== id) }))
   },
 
   setArchived: async (id, archived) => {

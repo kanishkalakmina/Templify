@@ -66,14 +66,12 @@ export class TemplateStore {
     })
   }
 
-  async remove(id: string): Promise<boolean> {
-    return this.mutate(async (all) => {
-      const next = all.filter((t) => t.id !== id)
-      if (next.length === all.length) return false
-      await this.writeAll(next)
-      return true
-    })
-  }
+  /*
+   * There is deliberately no `remove`. Deletion is not reachable over HTTP (see
+   * the DELETE handler in index.ts), so a store method for it would exist only
+   * to be called by mistake. Retiring a design is `save` with `archived: true`;
+   * genuine removal is an operator action against the volume.
+   */
 
   /** Runs `fn` with exclusive access to the catalogue. */
   private mutate<T>(fn: (all: ReportTemplate[]) => Promise<T>): Promise<T> {

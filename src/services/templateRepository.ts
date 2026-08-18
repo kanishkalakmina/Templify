@@ -25,7 +25,13 @@ export interface TemplateRepository {
   get(handle: string): Promise<ReportTemplate | undefined>
   save(template: ReportTemplate): Promise<WriteResult>
   saveAll(templates: ReportTemplate[]): Promise<WriteResult>
-  remove(id: string): Promise<WriteResult>
+  /*
+   * There is deliberately no `remove`. A `templateId` is a contract —
+   * applications POST it, and documents already issued name it — so retiring a
+   * design is `save` with `archived: true`, which keeps it renderable for
+   * callers that still reference the id. See the DELETE handler in
+   * `server/index.ts`.
+   */
   /** True when the id is free — enforces the uniqueness rule on create. */
   isIdAvailable(id: string, exceptId?: string): Promise<boolean>
 }
@@ -70,14 +76,6 @@ export class LocalStorageTemplateRepository implements TemplateRepository {
 
   async saveAll(templates: ReportTemplate[]): Promise<WriteResult> {
     return writeJSON(this.key, templates)
-  }
-
-  async remove(id: string): Promise<WriteResult> {
-    const all = await this.list()
-    return writeJSON(
-      this.key,
-      all.filter((t) => t.id !== id),
-    )
   }
 
   async isIdAvailable(id: string, exceptId?: string): Promise<boolean> {
@@ -136,11 +134,6 @@ export class HttpTemplateRepository implements TemplateRepository {
   async saveAll(templates: ReportTemplate[]): Promise<WriteResult> {
     const results = await Promise.all(templates.map((t) => this.save(t)))
     return results.every((r) => r.ok) ? { ok: true } : { ok: false, reason: 'unknown' }
-  }
-
-  async remove(id: string): Promise<WriteResult> {
-    const response = await fetch(this.url(`/${encodeURIComponent(id)}`), { method: 'DELETE' })
-    return response.ok ? { ok: true } : { ok: false, reason: 'unknown' }
   }
 
   async isIdAvailable(id: string, exceptId?: string): Promise<boolean> {

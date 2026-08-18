@@ -116,6 +116,7 @@ try {
     ['Same Data Demo', '/src/pages/ComparePage.tsx', 'ComparePage'],
     ['API', '/src/pages/ApiPage.tsx', 'ApiPage'],
     ['Settings', '/src/pages/SettingsPage.tsx', 'SettingsPage'],
+    ['Help', '/src/pages/HelpPage.tsx', 'HelpPage'],
   ]
 
   settingsStore.useSettingsStore.getState().hydrate()
@@ -181,6 +182,23 @@ try {
     rendered.API?.includes('/api/reports/render') ?? false)
   check('settings shows the docker image', rendered.Settings?.includes('templify/report-server') ?? false)
   check('demo page states the thesis', rendered['Same Data Demo']?.includes('Same Data') ?? false)
+
+  /*
+   * The counter-print guide and its live demo. The demo's button is gated on a
+   * report server being present, and SSR sees the store's empty state (see the
+   * note below), so only the section and its fallback can be asserted here.
+   */
+  check('help page explains the render call', rendered.Help?.includes('/api/reports/render') ?? false)
+  check('help page argues for HTML over PDF', rendered.Help?.includes('Ask for HTML, not PDF') ?? false)
+  check('help page warns against hardcoding A4', rendered.Help?.includes('Do not hardcode A4') ?? false)
+  check('help page says save the bill first', rendered.Help?.includes('Save the bill first') ?? false)
+  check('help page covers the one-page cap', rendered.Help?.includes('Only the first page renders') ?? false)
+  check('help page points at the runnable example',
+    rendered.Help?.includes('examples/pos-counter-print') ?? false)
+  check('demo page offers the counter print flow',
+    rendered['Same Data Demo']?.includes('Print it at the counter') ?? false)
+  check('demo page degrades without a server',
+    rendered['Same Data Demo']?.includes('Needs the report server') ?? false)
   check('no React error boundaries tripped', !Object.values(rendered).some((h) => h.includes('Minified React error')))
 
   /*
