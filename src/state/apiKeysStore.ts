@@ -1,10 +1,14 @@
 /**
  * API keys shown on the API page.
  *
- * Deliberately **in-memory only**. These are illustrative values for a
- * self-hosted server that does not exist yet, and persisting anything
- * credential-shaped to `localStorage` would model a bad practice in a product
- * whose whole premise is keeping customer data inside their own perimeter.
+ * Deliberately **in-memory only**, and illustrative rather than functional: the
+ * server authenticates against a single `TEMPLIFY_API_KEY` from its environment,
+ * so a key minted in the browser would authenticate nothing. Registering one
+ * would mean the editor could hand out server credentials, and persisting
+ * anything credential-shaped to `localStorage` would model a bad practice in a
+ * product whose whole premise is keeping customer data inside their perimeter.
+ *
+ * The API page says as much on screen, so the affordance does not overpromise.
  */
 
 import { create } from 'zustand'

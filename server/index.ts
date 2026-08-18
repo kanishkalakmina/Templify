@@ -114,13 +114,28 @@ app.put('/api/templates/:id', requireKey, async (req, res) => {
   res.json(await store.save(template))
 })
 
-app.delete('/api/templates/:id', requireKey, async (req, res) => {
-  const id = param(req, 'id')
-  if (!(await store.remove(id))) {
-    res.status(404).json({ error: 'not_found', templateId: id })
-    return
-  }
-  res.status(204).end()
+/**
+ * Deletion is not offered over HTTP.
+ *
+ * A `templateId` is a contract: applications POST it, and documents already
+ * issued name it. Removing one silently breaks every caller still rendering it,
+ * and no amount of confirmation dialog makes that recoverable — so the capability
+ * is absent rather than guarded.
+ *
+ * Archiving is the supported way to retire a design. It hides the template from
+ * the library while leaving it renderable, so live integrations keep working:
+ * `PUT` the template with `"archived": true`.
+ *
+ * Genuine removal is an operator action against the `/data` volume, where it
+ * belongs — deliberate, local, and outside the reach of a leaked key.
+ */
+app.delete('/api/templates/:id', requireKey, (req, res) => {
+  res.status(405).set('Allow', 'GET, PUT').json({
+    error: 'method_not_allowed',
+    message:
+      'Templates cannot be deleted over the API. Retire one by archiving it: PUT the template with "archived": true, which keeps it renderable for callers that still reference the id.',
+    templateId: param(req, 'id'),
+  })
 })
 
 /* -------------------------------------------------------------------------- */

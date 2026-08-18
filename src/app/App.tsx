@@ -13,6 +13,7 @@ import { TemplateLibraryPage } from '@/pages/TemplateLibraryPage'
 import { ComparePage } from '@/pages/ComparePage'
 import { ApiPage } from '@/pages/ApiPage'
 import { SettingsPage } from '@/pages/SettingsPage'
+import { HelpPage } from '@/pages/HelpPage'
 import { EditorPage } from '@/pages/EditorPage'
 import { PreviewPage } from '@/pages/PreviewPage'
 
@@ -47,6 +48,7 @@ export function App() {
           <Route path="demo" element={<ComparePage />} />
           <Route path="api" element={<ApiPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="help" element={<HelpPage />} />
         </Route>
 
         {/* The editor and preview own the full viewport. */}

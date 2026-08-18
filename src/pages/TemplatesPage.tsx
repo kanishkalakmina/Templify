@@ -26,7 +26,6 @@ const FILTERS: { value: CategoryFilter; label: string }[] = [
 export function TemplatesPage() {
   const navigate = useNavigate()
   const templates = useTemplateStore((s) => s.templates)
-  const remove = useTemplateStore((s) => s.remove)
   const setArchived = useTemplateStore((s) => s.setArchived)
   const duplicate = useTemplateStore((s) => s.duplicate)
   const updateMeta = useTemplateStore((s) => s.updateMeta)
@@ -76,15 +75,11 @@ export function TemplatesPage() {
           toast({ title: template.archived ? 'Template unarchived' : 'Template archived' })
         },
       },
-      {
-        label: 'Delete',
-        danger: true,
-        onClick: async () => {
-          if (!window.confirm(`Delete "${template.name}"? This cannot be undone.`)) return
-          await remove(template.id)
-          toast({ title: 'Template deleted' })
-        },
-      },
+      /*
+       * No Delete. A templateId is a contract — applications POST it and issued
+       * documents name it — so Archive is the way to retire a design: it leaves
+       * the library but stays renderable, and nothing already integrated breaks.
+       */
     ]
   }
 

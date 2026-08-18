@@ -46,7 +46,8 @@ changes design while the data stays put.
 ## 2. Scope
 
 **In scope:** templates · template editing · data binding · preview · template versions ·
-template management · API integration concept.
+template management · API integration concept · in-product integration guidance and a working
+demonstration of the payload-to-paper path (FR-19, FR-20).
 
 **Explicitly out of scope — do not build:** email, monitoring, payments, CRM features.
 
@@ -80,7 +81,12 @@ API Documentation); recent activity feed.
 ### FR-3 Template management
 Search, category filters (All/Invoices/Quotations/Receipts/Reports/Certificates/HR/Other),
 cards bearing **real preview thumbnails**. Per-template actions: Edit, Preview, Duplicate,
-Rename, Delete, Archive, Version history.
+Rename, Archive, Version history.
+
+*Amended 2026-08-18: Delete removed. A `templateId` is an integration contract — applications
+post it and issued documents name it — so removing one silently breaks every caller still
+rendering it. Archive is the retirement path: out of the library, still renderable. `DELETE
+/api/templates/:id` answers `405`; genuine removal is an operator action on the data volume.*
 
 ### FR-4 Template Library
 Users must never start from a blank page. Built-in catalogue across Invoices (6),
@@ -171,6 +177,31 @@ Undo, Redo, Save, Delete, Duplicate, Copy, Paste — with hints surfaced in tool
 Purposeful empty states (no templates / no variables / no versions) and subtle toasts for
 saved, logo updated, version created, duplicated, restored, data applied, variable inserted.
 
+### FR-19 Integration guide (Help screen)
+An in-product guide for the developer wiring Templify into an application, written around one
+concrete scenario — a bill is generated, a popup shows it, the user prints it and hands it
+over — rather than as an API tour. Covers, in the order the questions arrive: save the record
+before rendering; ask for HTML rather than PDF when the destination is a printer; size the
+popup from the document instead of hardcoding A4; keep Templify on the caller's own origin;
+and decide per document class whether a reprint may look different. Carries the constraints
+that bite in production (single-page cap, quiet missing bindings, short client timeouts, no
+silent printing) rather than leaving them to be discovered.
+
+*Added 2026-08-18. Not in the original 39-section brief: it answers the first question every
+integrator asked, which §14's API page states but does not explain.*
+
+### FR-20 Print a document from a calling application
+The product must demonstrate, not merely document, the path from payload to paper. The Same
+Data Demo screen renders the selected template and payload through the real
+`/api/reports/render` endpoint and presents it as a calling application would — a popup that
+takes its dimensions from the document itself, scaled to fit the window, with the print
+dialog one click away. Degrades to an explanation when no report server is present, since the
+comparison above it works backend-free and the demonstration cannot.
+
+Specified in full, including the decisions and their rationale, in
+[`tech-spec-counter-print.md`](tech-spec-counter-print.md). Reference implementation:
+`examples/pos-counter-print`.
+
 ## 5. The flow that must feel polished (§33)
 
 Library → browse → preview Invoice Modern → Use Template → name + ID → editor → change
@@ -248,3 +279,6 @@ Change the design without changing application code.*
 | --- | --- | --- |
 | 1 | External UI mock covering **both** app chrome and report/document layouts | Pending from stakeholder — blocks all UI implementation |
 | 2 | QR/barcode encoding fidelity in the prototype | Prototype renders a visual placeholder; real encoding is a server concern |
+| 3 | **Pagination.** Documents do not reflow across pages and the PDF renderer is capped at page one, so a bill with enough line items is truncated | Open — the blocking gap for FR-20 in production. See K-1 in [`tech-spec-counter-print.md`](tech-spec-counter-print.md) |
+| 4 | **Receipt / thermal page size.** `PageSize` admits only A4, A5 and LETTER, so an 80mm roll cannot be expressed | Open — wants content-driven height, so it follows item 3. K-2 |
+| 5 | **Page geometry is published as an enum, not dimensions.** Clients that lay out before rendering must map `"A5"` to pixels themselves | Open — mitigated for FR-20 by measuring the rendered document. K-2 / §8 |

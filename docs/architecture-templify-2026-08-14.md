@@ -496,6 +496,51 @@ silently. Canvas, preview and thumbnail differ only in scale, mode and surroundi
 
 ---
 
+### C-11 · Render Client (`src/services/renderClient.ts`)
+
+**Purpose:** The app asking the *report server* for a document, as a calling application
+would — the counterpart to C-4, which resolves documents in-process for the canvas.
+
+**Responsibilities:** POST `templateId` + payload to `/api/reports/render`; request
+`format: "html"`; surface `X-Templify-Missing-Bindings` and `X-Templify-Locale` as structured
+data rather than leaving callers to parse headers.
+
+**Why it exists separately from C-6:** the template repository moves *designs*; this moves
+*documents*. Folding a render call into a persistence port would blur the one seam the
+self-hosting story depends on.
+
+**Why HTML rather than PDF:** `iframe.contentWindow.print()` is honoured on markup and
+frequently ignored on an embedded PDF; the HTML branch never launches Chromium, so it returns
+in milliseconds; and the PDF is Chromium printing that same markup, so paper is identical.
+Recorded as D-C1.
+
+**FRs addressed:** FR-20.
+
+---
+
+### C-12 · Document Print Dialog (`src/components/DocumentPrintDialog.tsx`)
+
+**Purpose:** The popup a calling application shows between generating a document and printing
+it.
+
+**Responsibilities:** Host the markup in a same-origin `srcDoc` iframe; measure the
+document's own dimensions; scale it to fit the viewport; trigger and re-trigger printing;
+display unresolved bindings.
+
+**What it deliberately does not know:** what paper size the document is. There is no A4/A5
+table in the component. The rendered markup states its size as an inline style on the page
+element, so a page size added to Templify later needs no change here (D-C2). It also does not
+know how to draw a document — that remains C-10's job, reached through the server.
+
+**Why a transform rather than a smaller frame:** the page inside is a fixed-width element, so
+a smaller iframe clips it and grows scrollbars instead of shrinking. The frame keeps true
+dimensions and is scaled visually; because the transform lives in the host document, printed
+output is unaffected (D-C3).
+
+**FRs addressed:** FR-19, FR-20.
+
+---
+
 ## Data Architecture
 
 ### Data Model
@@ -597,9 +642,13 @@ POST   /api/reports/render      Render a document from templateId + data   ← t
 GET    /api/templates           List templates
 POST   /api/templates           Create a template
 GET    /api/templates/:id       Fetch one (accepts :id or id:vN)
-PUT    /api/templates/:id       Update
-DELETE /api/templates/:id       Delete
+PUT    /api/templates/:id       Update — archive with "archived": true
+DELETE /api/templates/:id       405 Method Not Allowed — see D-12
 ```
+
+Only the first is an integration surface. The template routes are the editor's own
+persistence, reached over HTTP because the editor is browser code talking to a container —
+not an API a calling application is expected to use.
 
 **Core request:**
 
@@ -1062,6 +1111,40 @@ to add when it becomes a product.
 ✗ Lose: nothing today; a real gap once multi-user editing is wanted.
 *Rationale:* the trust boundary is the customer's network perimeter.
 
+**D-9 · HTML, not PDF, when a document is destined for a printer**
+✓ Gain: scripted printing works; no Chromium on the request path; identical paper.
+✗ Lose: no file on disk — a second call is needed when one is genuinely wanted.
+*Rationale:* three reasons converge, and the third makes the first two free: the PDF *is*
+Chromium printing the same markup. Full reasoning in `tech-spec-counter-print.md` (D-C1).
+
+**D-10 · Clients measure the rendered document rather than mapping a page-size enum**
+✓ Gain: no page-dimension table in any client; new page sizes propagate with no client change.
+✗ Lose: couples clients to the rendered markup exposing its size on `body > div`.
+*Rationale:* the API publishes `"A5"`, not pixels, so every client would otherwise carry an
+mm→px table and silently fall back to A4 when a receipt size is added. The rendered document
+already states its dimensions. The coupling is acknowledged with a known, small removal —
+publish the computed dimensions as response headers (D-C2, §8).
+
+**D-12 · Templates cannot be deleted — archiving replaces deletion**
+✓ Gain: a `templateId` is genuinely permanent, so no caller can be broken by a deletion, and
+a leaked key cannot destroy a catalogue.
+✗ Lose: housekeeping requires volume access; the catalogue accumulates archived designs.
+*Rationale:* the id is an integration contract — applications post it and issued documents
+name it — so deletion is a capability whose blast radius reaches outside the product
+entirely. `archived` was already in the schema and already honoured by the library UI, while
+the server never consults it, so an archived template stops being offered and keeps
+rendering. That is the exact semantics wanted, so the capability is absent rather than
+guarded: `DELETE` answers `405`, and the port has no `remove`. Removed from the editor's menu
+too — a guard that the editor bypasses is not a guarantee.
+
+**D-11 · Reprint policy is a per-document-class decision, not a product-wide one**
+✓ Gain: shop bills need no storage and can be rendered entirely client-side.
+✗ Lose: two integration shapes to document instead of one.
+*Rationale:* the numbers come from the caller's own saved record either way, so only layout
+drifts on a live reprint. That is acceptable for a receipt and unacceptable for a tax invoice.
+Forcing either policy on both would add storage nobody needs or licence drift nobody wants
+(D-C5).
+
 ---
 
 ## Open Issues & Risks
@@ -1111,6 +1194,22 @@ to add when it becomes a product.
    deliberate non-goal now; noted because D-1 is the decision that would need revisiting.
 6. **Template marketplace** — the `.templify` format and copy-on-use semantics already
    support it.
+7. **Operator login, so template writes are a person's action rather than a key's**
+   (planned) — revisits D-8. Today one `TEMPLIFY_API_KEY` gates every route equally, so an
+   application given the key to render can also rewrite templates, and a key that reaches a
+   browser bundle or an app binary carries that authority with it. Three notes for whoever
+   builds it:
+
+   - **Issue an httpOnly session cookie rather than handing the editor a token.** The editor
+     is browser code and cannot hold a secret, but a cookie it never reads is attached to its
+     `PUT` automatically (see C-6 — Save *is* an HTTP write).
+   - **`TEMPLIFY_API_KEY` then becomes render-only.** Writes require the session; the key
+     renders and reads. That split is the actual security gain, not the login screen itself.
+   - **The change is localized.** Every route passes through one `requireKey` middleware, so
+     the distinction lives in one function rather than spreading across handlers.
+
+   Deletion is unaffected either way: D-12 removes the capability rather than gating it, so
+   no credential grants it.
 
 ---
 
@@ -1129,6 +1228,7 @@ to add when it becomes a product.
 | Version | Date | Author | Changes |
 |---------|------|--------|---------|
 | 1.0 | 2026-08-14 | LakminaEgodawatthaBI | Initial architecture |
+| 1.1 | 2026-08-18 | LakminaEgodawatthaBI | Added C-11 (render client) and C-12 (print dialog) for FR-19/FR-20; decisions D-9 through D-11; companion `tech-spec-counter-print.md` |
 
 ---
 

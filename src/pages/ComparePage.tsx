@@ -1,12 +1,15 @@
 import { useMemo, useState } from 'react'
 import { PageBody } from '@/app/AppShell'
+import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/controls'
 import { DocumentPage } from '@/render/DocumentPage'
 import { LocalePicker } from '@/components/LocalePicker'
+import { DocumentPrintDialog } from '@/components/DocumentPrintDialog'
 import { useTemplateStore } from '@/state/templateStore'
 import { useTestDataStore } from '@/state/testDataStore'
 import { useSettingsStore } from '@/state/settingsStore'
 import { resolveDocument } from '@/services/resolveDocument'
+import { renderDocumentHtml, type RenderedDocument } from '@/services/renderClient'
 import { DEFAULT_TEST_DATA } from '@/data/sampleData'
 
 const SCALE = 0.4
@@ -55,6 +58,30 @@ export function ComparePage() {
     () => (template ? resolveDocument(template, data, { mode: 'print', locale }) : null),
     [template, data, locale],
   )
+
+  /*
+   * The counter-print demo below goes through the API rather than the canvas
+   * above, so it needs a report server. Frontend-only mode has no render
+   * endpoint to call, and saying so is better than a button that fails.
+   */
+  const storageMode = useTemplateStore((s) => s.mode)
+  const serverUrl = useTemplateStore((s) => s.serverUrl)
+
+  const [printed, setPrinted] = useState<RenderedDocument | null>(null)
+  const [printing, setPrinting] = useState(false)
+  const [printError, setPrintError] = useState('')
+
+  async function renderAndPrint() {
+    setPrinting(true)
+    setPrintError('')
+    try {
+      setPrinted(await renderDocumentHtml(serverUrl, templateId, data, { locale }))
+    } catch (error) {
+      setPrintError((error as Error).message)
+    } finally {
+      setPrinting(false)
+    }
+  }
 
   const request = `POST /api/reports/render
 {
@@ -118,6 +145,64 @@ export function ComparePage() {
           )}
         </div>
       </div>
+
+      {/* ------------------------------------------------- counter print demo */}
+      <section className="mt-5 rounded-2xl border border-line bg-panel p-5">
+        <div className="text-[15px] font-semibold">Print it at the counter</div>
+        <div className="mt-[7px] max-w-[720px] text-[12.5px] leading-relaxed text-muted">
+          The document above is drawn by the canvas. This button asks the{' '}
+          <span className="font-mono text-accent-link">/api/reports/render</span> endpoint for
+          the same document as print-ready markup and shows it the way your application would
+          — a popup, sized from the document itself, with the print dialog a click away. It is
+          the bill-at-a-till case, running against this server with the payload and template
+          selected above.
+        </div>
+
+        {storageMode === 'server' ? (
+          <>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <Button
+                size="md"
+                variant="primary"
+                disabled={printing || !template}
+                onClick={renderAndPrint}
+              >
+                {printing ? 'Rendering…' : 'Render & print'}
+              </Button>
+              <span className="text-[11.5px] text-faint">
+                Returns HTML, not PDF — it prints reliably from an iframe and skips Chromium
+                entirely, so it comes back in milliseconds.
+              </span>
+            </div>
+
+            {printError ? (
+              <div className="mt-3 rounded-xl border border-[rgba(227,93,106,.4)] bg-[rgba(227,93,106,.1)] p-3 text-[11.5px] leading-relaxed text-danger">
+                {printError}
+              </div>
+            ) : null}
+          </>
+        ) : (
+          <div className="mt-4 rounded-xl border border-line bg-toolbar p-[13px] text-[11.5px] leading-relaxed text-muted">
+            Needs the report server. This browser is in frontend-only mode, so there is no
+            render endpoint to call — start the container and reload. The comparison above
+            works either way, because the canvas renders in-browser.
+          </div>
+        )}
+
+        <div className="mt-4 text-[11.5px] leading-relaxed text-faint">
+          The code is on the <span className="text-ink-2">Help</span> screen, and{' '}
+          <span className="font-mono">examples/pos-counter-print</span> is a runnable till
+          screen built on it.
+        </div>
+      </section>
+
+      <DocumentPrintDialog
+        open={Boolean(printed)}
+        title={`${templateId} · print preview`}
+        html={printed?.html ?? ''}
+        missing={printed?.missing ?? []}
+        onClose={() => setPrinted(null)}
+      />
     </PageBody>
   )
 }
