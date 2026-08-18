@@ -1,0 +1,47 @@
+name: Feature request
+description: Suggest a capability
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Email, monitoring, payments and CRM features are deliberately out of scope — see
+        CONTRIBUTING.md. Anything else is fair to propose.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: What can you not do today? Describe the situation, not the solution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Editor
+        - Templates / built-in library
+        - Data binding
+        - Rendering / PDF
+        - Server / API
+        - Docker / deployment
+        - Documentation
+        - Internationalisation
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: offer
+    attributes:
+      label: Would you like to build it?
+      options:
+        - label: I would be willing to open a pull request for this

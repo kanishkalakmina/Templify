@@ -1,0 +1,14 @@
+# Every pull request gets the maintainer as a reviewer.
+*       @kanishkalakmina
+
+# Architecture-critical paths. Changes here can break the promise that a PDF
+# matches the editor, or that a template file cannot execute code.
+/src/types/      @kanishkalakmina
+/src/services/   @kanishkalakmina
+/src/render/     @kanishkalakmina
+/server/         @kanishkalakmina
+
+# Anything that affects how the project is built, released or governed.
+/.github/        @kanishkalakmina
+/Dockerfile      @kanishkalakmina
+/docker-compose.yml @kanishkalakmina

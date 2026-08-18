@@ -1,0 +1,138 @@
+# Runs on every pull request and every push to main.
+#
+# This is the workflow the branch ruleset requires: without a check that runs on
+# PRs, "CI must pass before merging" has nothing to enforce.
+
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A new push to a PR cancels the previous run rather than queueing behind it.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Type check and verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      # Chromium is a runtime dependency of the server, not of the install.
+      - run: npm ci
+        env:
+          PUPPETEER_SKIP_DOWNLOAD: 'true'
+
+      # `build:all` runs `tsc -b` across the app, node and server projects,
+      # then bundles the server — so this covers type checking too.
+      - name: Build
+        run: npm run build:all
+
+      - name: Domain checks
+        run: npm run verify
+
+      - name: Render checks
+        run: npm run verify:render
+
+  image:
+    name: Docker image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Build only — nothing is published from a pull request. This exists
+      # because the image has broken on things the Node checks cannot see, such
+      # as an apt package missing from the base image.
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  smoke:
+    name: Render a document end to end
+    needs: image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image locally
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: templify:ci
+          cache-from: type=gha
+
+      - name: Start the server
+        run: |
+          docker run -d --name templify-ci -p 8080:8080 --shm-size=512m templify:ci
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/api/health >/dev/null 2>&1; then
+              echo "up after ${i}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server did not become healthy"; docker logs templify-ci; exit 1
+
+      - name: Health reports a working PDF renderer
+        run: |
+          health=$(curl -fsS http://127.0.0.1:8080/api/health)
+          echo "$health"
+          echo "$health" | grep -q '"pdf":true' || { echo "Chromium unavailable in the image"; exit 1; }
+
+      - name: Render every built-in template to PDF
+        run: |
+          ids="invoice-modern invoice-classic invoice-corporate invoice-minimal
+               invoice-professional invoice-bold quotation-modern quotation-corporate
+               quotation-simple receipt-modern receipt-compact receipt-professional
+               business-report financial-report sales-report monthly-report
+               certificate-modern certificate-classic certificate-minimal
+               payslip-modern employee-report employment-certificate
+               delivery-note purchase-order audit-report custom-report"
+          data='{"company":{"name":"Acme","address":"Colombo","email":"a@b.c","phone":"+94"},
+                 "customer":{"name":"John Doe","email":"j@d.c","address":"Kandy"},
+                 "invoice":{"number":"INV-1","date":"2026-08-14","dueDate":"2026-09-13",
+                            "subtotal":1000,"discount":0,"tax":0,"total":1000},
+                 "items":[{"name":"Item","quantity":1,"price":1000,"total":1000}]}'
+          fail=0
+          for id in $ids; do
+            body=$(printf '{"templateId":"%s","data":%s}' "$id" "$data")
+            code=$(curl -s -o "/tmp/$id.pdf" -w '%{http_code}' \
+              -X POST http://127.0.0.1:8080/api/reports/render \
+              -H 'Content-Type: application/json' -d "$body")
+            size=$(stat -c%s "/tmp/$id.pdf" 2>/dev/null || echo 0)
+            head=$(head -c 5 "/tmp/$id.pdf" 2>/dev/null || true)
+            if [ "$code" != "200" ] || [ "$head" != "%PDF-" ] || [ "$size" -lt 8000 ]; then
+              echo "FAIL $id  http=$code size=$size"; fail=1
+            fi
+          done
+          [ "$fail" = "0" ] && echo "all templates rendered valid PDFs"
+          exit $fail
+
+      - name: Server logs on failure
+        if: failure()
+        run: docker logs templify-ci || true
+
+      - name: Stop
+        if: always()
+        run: docker rm -f templify-ci || true

@@ -466,6 +466,48 @@ customer's network removes an entire class of data-residency objection.
 
 ---
 
+## Contributing
+
+Contributions are welcome. Start with [CONTRIBUTING.md](CONTRIBUTING.md) — it covers setup,
+the checks a pull request has to pass, and the architecture rules that keep a rendered PDF
+identical to what the editor shows.
+
+- Good entry points: issues labelled [`good first issue`](https://github.com/kanishkalakmina/Templify/labels/good%20first%20issue)
+  and [`help wanted`](https://github.com/kanishkalakmina/Templify/labels/help%20wanted)
+- Questions and ideas: [Discussions](https://github.com/kanishkalakmina/Templify/discussions)
+- Security issues: [SECURITY.md](SECURITY.md) — please report privately
+
+`main` is protected. Everything lands through a pull request with CI green.
+
+## Roadmap
+
+Done:
+
+- [x] Generic template schema, independent of React
+- [x] Editor: drag, resize, snapping, alignment guides, undo/redo
+- [x] Data binding with `{{path}}` tokens, repeaters and conditions
+- [x] 26 built-in templates across 7 categories
+- [x] Template versioning with `:vN` pinning
+- [x] `.templify` import / export
+- [x] Self-hosted report server with real PDF rendering
+- [x] Docker image published to ghcr.io
+- [x] Documents rendered in seven languages
+
+Next — the known gaps, and the most useful places to help:
+
+- [ ] **Pagination.** Elements are absolutely positioned and do not reflow, so content
+      longer than one page overflows. The largest gap between this and a shippable product.
+- [ ] **Real QR and barcode encoding.** Currently deliberate visual placeholders that do
+      not scan.
+- [ ] **An automated test suite.** The two verify scripts cover the domain layer; there is
+      no component or end-to-end coverage.
+- [ ] **Authentication and multi-user workspaces.** Today the trust boundary is the network.
+- [ ] **Template variable contracts.** `variables[]` is declared but not enforced against
+      an incoming payload.
+- [ ] **Nested element selection** on the canvas — grouping works, drilling into a group
+      does not.
+- [ ] More built-in templates, and more languages.
+
 ## Known limitations
 
 Recorded plainly rather than discovered later:

@@ -1,0 +1,76 @@
+name: Bug report
+description: Something renders or behaves incorrectly
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the problem is visual, a screenshot or the rendered PDF is worth more than any
+        description.
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What happens
+      description: And what you expected instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open the editor on invoice-modern
+        2. Select the PAYMENT block
+        3. ...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where
+      options:
+        - Editor / canvas
+        - Document rendering (preview or PDF)
+        - Report server / API
+        - Docker image
+        - Template library or management
+        - Somewhere else
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: How are you running it
+      options:
+        - npm run dev (browser storage, no server)
+        - docker compose / docker run
+        - Published ghcr.io image
+    validations:
+      required: true
+
+  - type: input
+    id: template
+    attributes:
+      label: Template ID
+      description: If it only affects certain templates.
+      placeholder: invoice-modern
+
+  - type: textarea
+    id: payload
+    attributes:
+      label: Data payload
+      description: The JSON you rendered with, trimmed down. Please remove anything real.
+      render: json
+
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      placeholder: |
+        Templify version:
+        Browser:
+        OS:
