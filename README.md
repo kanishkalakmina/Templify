@@ -1,5 +1,8 @@
 # Templify
 
+<img width="1632" height="2112" alt="Templify Poster-selection" src="https://github.com/user-attachments/assets/05322501-805f-4357-9d63-be15bf29d3bb" />
+
+
 **A self-hosted report template platform.**
 
 > Your application owns the data. Templify owns the document design.
