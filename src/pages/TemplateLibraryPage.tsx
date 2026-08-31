@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageBody } from '@/app/AppShell'
 import { Button } from '@/components/ui/Button'
+import { Input } from '@/components/ui/controls'
 import { Pill } from '@/components/ui/toggles'
 import { TemplateThumbnail } from '@/components/TemplateThumbnail'
 import { useTemplateStore } from '@/state/templateStore'
 import { useUiStore } from '@/state/uiStore'
 import { LIBRARY_GROUPS } from '@/templates/builtin'
-import { CATEGORIES, type CategoryFilter } from '@/services/templateCatalog'
+import { CATEGORIES, filterTemplates, type CategoryFilter } from '@/services/templateCatalog'
 import { PAGE_SIZE_LABEL } from '@/utils/page'
 
 const FILTERS: { value: CategoryFilter; label: string }[] = [
@@ -20,20 +21,47 @@ export function TemplateLibraryPage() {
   const builtIns = useTemplateStore((s) => s.builtIns)
   const openCreate = useUiStore((s) => s.openCreateDialog)
   const [category, setCategory] = useState<CategoryFilter>('all')
+  const [searchQuery, setSearchQuery] = useState('')
 
   const groups = useMemo(
-    () => LIBRARY_GROUPS.filter((group) => category === 'all' || group.category === category),
-    [category],
+    () =>
+      LIBRARY_GROUPS.filter((group) => category === 'all' || group.category === category)
+        .map((group) => ({
+          ...group,
+          specs: group.specs.filter((spec) => {
+            const template = builtIns.find((t) => t.id === spec.id)
+            if (template) {
+              return filterTemplates([template], { query: searchQuery }).length > 0
+            }
+            const q = searchQuery.toLowerCase().trim()
+            return !q || spec.name.toLowerCase().includes(q) || spec.id.toLowerCase().includes(q)
+          }),
+        }))
+        .filter((group) => group.specs.length > 0),
+    [category, searchQuery, builtIns],
   )
 
   return (
     <PageBody>
-      <div className="text-[22px] font-semibold tracking-[-.4px]">Template Library</div>
-      <div className="mt-[6px] text-[13px] text-muted">
-        Start from a professional layout — using one copies it into your templates, so built-ins
-        stay untouched.
+      {/* Header: Title + Subtitle on Left, Search Bar on Right */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end justify-between">
+        <div>
+          <div className="text-[22px] font-semibold tracking-[-.4px]">Template Library</div>
+          <div className="mt-[6px] text-[13px] text-muted max-w-[500px]">
+            Start from a professional layout — using one copies it into your templates, so built-ins
+            stay untouched.
+          </div>
+        </div>
+
+        <Input
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search templates..."
+          className="h-[34px] w-[220px] text-[12.5px]"
+        />
       </div>
 
+      {/* Category Pills Below Header */}
       <div className="mt-5 flex flex-wrap gap-[6px]">
         {FILTERS.map((filter) => (
           <Pill
@@ -45,57 +73,64 @@ export function TemplateLibraryPage() {
         ))}
       </div>
 
-      {groups.map((group) => (
-        <section key={group.name} className="mt-[30px]">
-          <div className="flex items-baseline gap-[9px]">
-            <div className="text-[14px] font-semibold">{group.name}</div>
-            <div className="text-[11px] text-faint">{group.specs.length} templates</div>
-          </div>
+      {/* Template Groups or Empty State */}
+      {groups.length === 0 ? (
+        <div className="mt-12 text-center text-[13px] text-muted">
+          No templates match your search.
+        </div>
+      ) : (
+        groups.map((group) => (
+          <section key={group.name} className="mt-[30px]">
+            <div className="flex items-baseline gap-[9px]">
+              <div className="text-[14px] font-semibold">{group.name}</div>
+              <div className="text-[11px] text-faint">{group.specs.length} templates</div>
+            </div>
 
-          <div className="mt-3 grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))]">
-            {group.specs.map((spec) => {
-              const template = builtIns.find((t) => t.id === spec.id)
-              if (!template) return null
+            <div className="mt-3 grid gap-[14px] [grid-template-columns:repeat(auto-fill,minmax(196px,1fr))]">
+              {group.specs.map((spec) => {
+                const template = builtIns.find((t) => t.id === spec.id)
+                if (!template) return null
 
-              return (
-                <div
-                  key={spec.id}
-                  className="overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-hover"
-                >
-                  <div className="relative flex h-[142px] items-center justify-center border-b border-line bg-app p-[14px]">
-                    <TemplateThumbnail template={template} maxWidth={84} maxHeight={119} />
-                    <div className="absolute left-2 top-2 rounded-[4px] border border-line-strong bg-[rgba(11,13,16,.72)] px-[6px] py-[3px] font-mono text-[8.5px] font-medium tracking-[.4px] text-muted">
-                      BUILT-IN
+                return (
+                  <div
+                    key={spec.id}
+                    className="overflow-hidden rounded-2xl border border-line bg-panel transition-colors hover:border-line-hover"
+                  >
+                    <div className="relative flex h-[142px] items-center justify-center border-b border-line bg-app p-[14px]">
+                      <TemplateThumbnail template={template} maxWidth={84} maxHeight={119} />
+                      <div className="absolute left-2 top-2 rounded-[4px] border border-line-strong bg-[rgba(11,13,16,.72)] px-[6px] py-[3px] font-mono text-[8.5px] font-medium tracking-[.4px] text-muted">
+                        BUILT-IN
+                      </div>
+                    </div>
+
+                    <div className="px-3 pb-3 pt-[11px]">
+                      <div className="text-[12.5px] font-medium">{spec.name}</div>
+                      <div className="mt-[3px] text-[10.5px] text-faint">
+                        {group.name} · {PAGE_SIZE_LABEL[template.page.size]}
+                      </div>
+                      <div className="mt-[11px] flex gap-[6px]">
+                        <Button
+                          className="h-[28px] flex-1"
+                          onClick={() => navigate(`/preview/${spec.id}?from=library`)}
+                        >
+                          Preview
+                        </Button>
+                        <Button
+                          variant="soft"
+                          className="h-[28px] flex-1"
+                          onClick={() => openCreate('use', spec.id)}
+                        >
+                          Use Template
+                        </Button>
+                      </div>
                     </div>
                   </div>
-
-                  <div className="px-3 pb-3 pt-[11px]">
-                    <div className="text-[12.5px] font-medium">{spec.name}</div>
-                    <div className="mt-[3px] text-[10.5px] text-faint">
-                      {group.name} · {PAGE_SIZE_LABEL[template.page.size]}
-                    </div>
-                    <div className="mt-[11px] flex gap-[6px]">
-                      <Button
-                        className="h-[28px] flex-1"
-                        onClick={() => navigate(`/preview/${spec.id}?from=library`)}
-                      >
-                        Preview
-                      </Button>
-                      <Button
-                        variant="soft"
-                        className="h-[28px] flex-1"
-                        onClick={() => openCreate('use', spec.id)}
-                      >
-                        Use Template
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+                )
+              })}
+            </div>
+          </section>
+        ))
+      )}
     </PageBody>
   )
 }
