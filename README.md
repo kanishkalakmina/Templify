@@ -491,14 +491,18 @@ identical to what the editor shows.
 
 ### Acknowledgements
 
-Thanks to everyone who has improved Templify:
+Thanks to everyone who has improved Templify.
+
+[![Contributors](https://contrib.rocks/image?repo=kanishkalakmina/Templify)](https://github.com/kanishkalakmina/Templify/graphs/contributors)
+
+That image is rendered from the repository's contributor graph, so it stays current on its
+own — nobody has to remember to add a name, and nobody gets left off.
+
+Worth describing rather than just counting:
 
 - [@Yeshu-18](https://github.com/Yeshu-18) — text search on the Template Library
   ([#16](https://github.com/kanishkalakmina/Templify/pull/16)), reusing the existing
   `filterTemplates` so library search matches the Templates screen exactly
-
-Contributed something? Add yourself here in the same pull request — it is not presumptuous,
-it is the point.
 
 ## Roadmap
 
