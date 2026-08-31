@@ -40,8 +40,8 @@ control — it is a design source, not a build input).
 
 | Area | State |
 | --- | --- |
-| Schema, binding engine, conditions, resolver, versioning, persistence, import/export | ✅ 56/56 runtime checks |
-| Design system, shell, all nine screens, editor workspace, 26 built-in layouts | ✅ 49/49 render checks |
+| Schema, binding engine, conditions, resolver, versioning, persistence, import/export | ✅ 117/117 runtime checks |
+| Design system, shell, all nine screens, editor workspace, 26 built-in layouts | ✅ 52/52 render checks |
 | Type check · production build | ✅ clean |
 
 **Screens:** Dashboard · Templates · Template Library · Same Data Demo · API · Settings ·
@@ -121,8 +121,8 @@ npm run build:all && TEMPLIFY_DATA_DIR=./.data TEMPLIFY_STATIC_DIR=./dist npm st
 | `npm run typecheck` | Types only |
 | `npm run build:all` | Frontend + server bundle |
 | `npm start` | Run the built server |
-| `npm run verify` | Runtime checks over the domain layer (56) |
-| `npm run verify:render` | Renders every screen and component (40) |
+| `npm run verify` | Runtime checks over the domain layer (117) |
+| `npm run verify:render` | Renders every screen and component (52) |
 
 The two verify scripts are worth knowing about. `verify` loads the real modules through
 Vite and asserts the behaviour the product depends on — binding resolution, repeater scope

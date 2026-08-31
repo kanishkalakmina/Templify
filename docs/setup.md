@@ -118,7 +118,8 @@ Health then reports `"pdf":true` and renders real PDFs.
 | `PORT` | `8080` | Listen port |
 | `TEMPLIFY_DATA_DIR` | `/data` | Where templates persist — mount this in Docker |
 | `TEMPLIFY_STATIC_DIR` | `/app/public` | Built frontend assets |
-| `TEMPLIFY_API_KEY` | *(unset)* | When set, every `/api/*` call needs `Authorization: Bearer <key>` |
+| `TEMPLIFY_API_KEY` | *(unset)* | When set, every `/api/*` call except `/api/health` needs `Authorization: Bearer <key>` |
+| `VITE_TEMPLIFY_KEY` | *(unset)* | **Build-time.** Key the editor sends. Set it to the same value as `TEMPLIFY_API_KEY`, or the editor comes up empty — see below |
 | `TEMPLIFY_RENDER_TIMEOUT_MS` | `30000` | Ceiling on a single render |
 | `TEMPLIFY_MAX_BODY` | `8mb` | Request body limit — payloads with base64 logos get large |
 | `PUPPETEER_EXECUTABLE_PATH` | `/usr/bin/chromium` | The browser used for PDF rendering |
@@ -126,6 +127,23 @@ Health then reports `"pdf":true` and renders real PDFs.
 `TEMPLIFY_API_KEY` is the *only* credential the server accepts. Keys generated on the API
 screen are illustrative values for showing the shape of the flow — they are held in memory and
 never registered with the server.
+
+**Turning auth on takes two settings, not one.** The server checks `TEMPLIFY_API_KEY`; the
+editor sends `VITE_TEMPLIFY_KEY`, which is compiled in when the frontend is built:
+
+```bash
+VITE_TEMPLIFY_KEY=secret123 npm run build
+docker compose up -d --build          # or rebuild the image, which runs that build
+```
+
+Set one without the other and the editor loads, reports the server as connected, and shows an
+empty workspace — every catalogue call is being refused. It now says so on screen instead,
+but the fix is to set both.
+
+Understand what this buys, though: the key is compiled into the bundle that this same server
+hands to every browser, so anyone who can open the editor can read it. It stops the editor
+breaking; it is not a security boundary. Keeping the instance off the public network is what
+protects it.
 
 ---
 
@@ -185,6 +203,13 @@ The frontend is compiled into the image. `docker compose up -d --build`.
 **`401 unauthorized` from `/api/*`**
 `TEMPLIFY_API_KEY` is set on the server. Send `Authorization: Bearer <that value>` — not a key
 generated on the API screen.
+
+**The editor shows no templates, but `/api/health` reports several**
+The server is refusing the editor. Confirm with
+`curl -s -o /dev/null -w '%{http_code}' localhost:8080/api/templates` — a `401` means
+`TEMPLIFY_API_KEY` is set without a matching `VITE_TEMPLIFY_KEY` in the build. Nothing has
+been deleted; the catalogue simply could not be read. The editor shows a banner explaining
+this.
 
 **A CORS error when your own app calls the API**
 Expected: Templify sends no CORS headers. Put both on one origin with a proxy rather than

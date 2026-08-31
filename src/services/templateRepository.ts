@@ -18,6 +18,27 @@ import type { ReportTemplate } from '@/types/template'
 import { StorageKeys, readJSON, writeJSON, type WriteResult } from './storage'
 import { parseHandle, templateAtVersion } from './versioning'
 
+/**
+ * A report-server call that failed, carrying the status code.
+ *
+ * The status is the point: a 401 is a misconfiguration the user can fix and must
+ * be told about, while a 500 is not. Throwing a bare `Error` lost that
+ * distinction and left the editor showing an empty catalogue either way (#11).
+ */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(`${message}: ${status}`)
+    this.name = 'ApiError'
+  }
+
+  get unauthorized(): boolean {
+    return this.status === 401
+  }
+}
+
 export interface TemplateRepository {
   /** All user-owned templates, including archived ones. */
   list(): Promise<ReportTemplate[]>
@@ -103,32 +124,48 @@ export class LocalStorageTemplateRepository implements TemplateRepository {
  * ```
  */
 export class HttpTemplateRepository implements TemplateRepository {
-  constructor(private readonly baseUrl: string) {}
+  /**
+   * `apiKey` is sent as `Authorization: Bearer …` on every call. Without it, a
+   * server started with `TEMPLIFY_API_KEY` rejects the catalogue with 401 and
+   * the editor comes up empty — which reads as data loss (#11).
+   */
+  constructor(
+    private readonly baseUrl: string,
+    private readonly apiKey = '',
+  ) {}
 
   private url(path = ''): string {
     return `${this.baseUrl.replace(/\/$/, '')}/api/templates${path}`
   }
 
+  /** Auth header when a key is configured, nothing when it is not. */
+  private headers(extra: Record<string, string> = {}): Record<string, string> {
+    return this.apiKey ? { ...extra, Authorization: `Bearer ${this.apiKey}` } : extra
+  }
+
   async list(): Promise<ReportTemplate[]> {
-    const response = await fetch(this.url())
-    if (!response.ok) throw new Error(`Failed to list templates: ${response.status}`)
+    const response = await fetch(this.url(), { headers: this.headers() })
+    if (!response.ok) throw new ApiError('Failed to list templates', response.status)
     return (await response.json()) as ReportTemplate[]
   }
 
   async get(handle: string): Promise<ReportTemplate | undefined> {
-    const response = await fetch(this.url(`/${encodeURIComponent(handle)}`))
+    const response = await fetch(this.url(`/${encodeURIComponent(handle)}`), {
+      headers: this.headers(),
+    })
     if (response.status === 404) return undefined
-    if (!response.ok) throw new Error(`Failed to load template: ${response.status}`)
+    if (!response.ok) throw new ApiError('Failed to load template', response.status)
     return (await response.json()) as ReportTemplate
   }
 
   async save(template: ReportTemplate): Promise<WriteResult> {
     const response = await fetch(this.url(`/${encodeURIComponent(template.id)}`), {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: this.headers({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(template),
     })
-    return response.ok ? { ok: true } : { ok: false, reason: 'unknown' }
+    if (response.ok) return { ok: true }
+    return { ok: false, reason: response.status === 401 ? 'unauthorized' : 'unknown' }
   }
 
   async saveAll(templates: ReportTemplate[]): Promise<WriteResult> {

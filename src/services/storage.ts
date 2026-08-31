@@ -41,7 +41,10 @@ export function readJSON<T>(key: string, fallback: T): T {
   }
 }
 
-export type WriteResult = { ok: true } | { ok: false; reason: 'quota' | 'unavailable' | 'unknown' }
+export type WriteResult =
+  | { ok: true }
+  /** `unauthorized`: the report server refused the key — see issue #11. */
+  | { ok: false; reason: 'quota' | 'unavailable' | 'unauthorized' | 'unknown' }
 
 export function writeJSON(key: string, value: unknown): WriteResult {
   if (!available()) return { ok: false, reason: 'unavailable' }

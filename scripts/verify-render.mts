@@ -212,6 +212,18 @@ try {
    */
   section('Components render with real data')
 
+  /*
+   * The 401 notice (#11). It is props-free and driven by store state the SSR
+   * harness cannot set, so it is rendered directly — what matters is that it
+   * reassures rather than alarms, since the failure it describes looks exactly
+   * like data loss.
+   */
+  const notice = await server.ssrLoadModule('/src/components/UnauthorizedNotice.tsx')
+  const noticeHtml = renderToString(React.createElement(notice.UnauthorizedNotice))
+  check('401 notice says the templates are safe', noticeHtml.includes('your templates are safe'))
+  check('401 notice names the offending variable', noticeHtml.includes('TEMPLIFY_API_KEY'))
+  check('401 notice gives a way out', noticeHtml.includes('VITE_TEMPLIFY_KEY'))
+
   const card = await server.ssrLoadModule('/src/components/TemplateCard.tsx')
   const page = await server.ssrLoadModule('/src/render/DocumentPage.tsx')
   const palettePanel = await server.ssrLoadModule('/src/editor/ComponentLibraryPanel.tsx')

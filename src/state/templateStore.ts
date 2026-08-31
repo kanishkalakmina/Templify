@@ -8,7 +8,7 @@
 
 import { create } from 'zustand'
 import type { ReportTemplate, TemplateCategory } from '@/types/template'
-import type { TemplateRepository } from '@/services/templateRepository'
+import { ApiError, type TemplateRepository } from '@/services/templateRepository'
 import {
   createRepository,
   type RepositoryBinding,
@@ -55,6 +55,15 @@ interface TemplateState {
   mode: StorageMode
   serverUrl: string
   serverInfo: ServerInfo | null
+  /**
+   * The server answered `/api/health` but refused the catalogue with a 401.
+   *
+   * Tracked separately from `mode` because the two are genuinely different
+   * states: `local` means there is no server, while this means there is one and
+   * it is rejecting us. Conflating them showed an empty workspace that read as
+   * data loss (#11).
+   */
+  authError: boolean
 
   hydrate: () => Promise<void>
 
@@ -82,14 +91,19 @@ interface TemplateState {
   restoreTemplateVersion: (id: string, version: number) => Promise<ReportTemplate | undefined>
 }
 
+const WRITE_FAILURE: Record<string, string> = {
+  quota: 'Browser storage is full. Export a template or remove unused ones to free space.',
+  unavailable: 'Local storage is unavailable in this browser.',
+  // Previously reported as a localStorage problem, which sent anyone running with
+  // TEMPLIFY_API_KEY looking in entirely the wrong place (#11).
+  unauthorized: 'The report server rejected the API key, so nothing was saved.',
+}
+
 function reportWriteFailure(result: { ok: boolean; reason?: string }) {
   if (result.ok) return
   toast({
     title: 'Could not save',
-    description:
-      result.reason === 'quota'
-        ? 'Browser storage is full. Export a template or remove unused ones to free space.'
-        : 'Local storage is unavailable in this browser.',
+    description: WRITE_FAILURE[result.reason ?? ''] ?? 'The template could not be saved.',
     tone: 'danger',
     duration: 6000,
   })
@@ -102,6 +116,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
   mode: 'local',
   serverUrl: '',
   serverInfo: null,
+  authError: false,
 
   hydrate: async () => {
     const resolved = await bind()
@@ -110,6 +125,7 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       set({
         templates,
         loaded: true,
+        authError: false,
         mode: resolved.mode,
         serverUrl: resolved.serverUrl,
         serverInfo: resolved.info,
@@ -118,13 +134,29 @@ export const useTemplateStore = create<TemplateState>((set, get) => ({
       // A server that answered /api/health but then failed should not leave the
       // app blank — surface it and carry on with an empty catalogue.
       console.error('[templates] Failed to load from server:', error)
-      set({ templates: [], loaded: true, mode: resolved.mode, serverUrl: resolved.serverUrl, serverInfo: resolved.info })
-      toast({
-        title: 'Could not load templates',
-        description: 'The report server responded but returned an error.',
-        tone: 'danger',
-        duration: 6000,
+
+      // A 401 is a misconfiguration the user can act on, and it needs to persist
+      // on screen: a toast that fades leaves an empty workspace behind it, which
+      // is exactly the "my templates are gone" reading this caused (#11).
+      const unauthorized = error instanceof ApiError && error.unauthorized
+
+      set({
+        templates: [],
+        loaded: true,
+        authError: unauthorized,
+        mode: resolved.mode,
+        serverUrl: resolved.serverUrl,
+        serverInfo: resolved.info,
       })
+
+      if (!unauthorized) {
+        toast({
+          title: 'Could not load templates',
+          description: 'The report server responded but returned an error.',
+          tone: 'danger',
+          duration: 6000,
+        })
+      }
     }
   },
 

@@ -1,5 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { UnauthorizedNotice } from '@/components/UnauthorizedNotice'
+import { useTemplateStore } from '@/state/templateStore'
 
 /** Persistent chrome. The editor and preview routes render outside this shell. */
 export function AppShell() {
@@ -21,9 +23,17 @@ export function PageBody({
   children: React.ReactNode
   width?: number
 }) {
+  /*
+   * Hoisted to the shared page frame rather than repeated per screen: a server
+   * rejecting the catalogue makes every management screen misleading, not just
+   * the one that happens to list templates (#11).
+   */
+  const authError = useTemplateStore((s) => s.authError)
+
   return (
     <div className="flex-1 overflow-auto px-11 pb-16 pt-9">
       <div className="mx-auto" style={{ maxWidth: width }}>
+        {authError ? <UnauthorizedNotice /> : null}
         {children}
       </div>
     </div>

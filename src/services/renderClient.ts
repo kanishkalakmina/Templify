@@ -34,9 +34,16 @@ export async function renderDocumentHtml(
   data: ReportData,
   options: { locale?: string; currency?: string } = {},
 ): Promise<RenderedDocument> {
+  // Same key the catalogue uses. Without it a server started with
+  // TEMPLIFY_API_KEY rejects the render with a 401 (#11).
+  const key = import.meta.env.VITE_TEMPLIFY_KEY ?? ''
+
   const response = await fetch(`${serverUrl}/api/reports/render`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(key ? { Authorization: `Bearer ${key}` } : {}),
+    },
     body: JSON.stringify({
       templateId,
       data,

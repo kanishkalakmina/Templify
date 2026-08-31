@@ -129,6 +129,55 @@ jobs:
           [ "$fail" = "0" ] && echo "all templates rendered valid PDFs"
           exit $fail
 
+      # Regression cover for #11: enabling auth used to leave the editor silently
+      # empty, because nothing in the frontend sent a key and the health probe
+      # kept reporting a healthy server. This pins the contract the fix relies on.
+      - name: Authenticated path — API key is enforced and accepted
+        run: |
+          docker run -d --name templify-auth -p 8099:8080 --shm-size=512m \
+            -e TEMPLIFY_API_KEY=secret123 templify:ci
+          for i in $(seq 1 30); do
+            curl -fsS http://127.0.0.1:8099/api/health >/dev/null 2>&1 && break
+            sleep 1
+          done
+
+          health=$(curl -fsS http://127.0.0.1:8099/api/health)
+          echo "$health"
+          echo "$health" | grep -q '"auth":"required"' \
+            || { echo "health should advertise that a key is required"; exit 1; }
+
+          # The probe endpoint stays open, which is what let the bug hide.
+          no_key=$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8099/api/templates)
+          [ "$no_key" = "401" ] \
+            || { echo "expected 401 without a key, got $no_key"; exit 1; }
+
+          with_key=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H 'Authorization: Bearer secret123' http://127.0.0.1:8099/api/templates)
+          [ "$with_key" = "200" ] \
+            || { echo "expected 200 with the key, got $with_key"; exit 1; }
+
+          wrong=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H 'Authorization: Bearer nope' http://127.0.0.1:8099/api/templates)
+          [ "$wrong" = "401" ] \
+            || { echo "expected 401 with a wrong key, got $wrong"; exit 1; }
+
+          rendered=$(curl -s -o /dev/null -w '%{http_code}' \
+            -H 'Authorization: Bearer secret123' -H 'Content-Type: application/json' \
+            -X POST http://127.0.0.1:8099/api/reports/render \
+            -d '{"templateId":"invoice-modern","data":{}}')
+          [ "$rendered" = "200" ] \
+            || { echo "authenticated render failed with $rendered"; exit 1; }
+
+          echo "auth enforced on the catalogue and the render endpoint"
+
+      - name: Auth server logs on failure
+        if: failure()
+        run: docker logs templify-auth || true
+
+      - name: Stop the auth server
+        if: always()
+        run: docker rm -f templify-auth || true
+
       - name: Server logs on failure
         if: failure()
         run: docker logs templify-ci || true
