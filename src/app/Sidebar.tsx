@@ -65,7 +65,14 @@ function ServerStatusCard() {
   const serverUrl = useTemplateStore((s) => s.serverUrl)
   const info = useTemplateStore((s) => s.serverInfo)
 
-  const connected = mode === 'server'
+  const authError = useTemplateStore((s) => s.authError)
+
+  /*
+   * "Connected" has to mean the catalogue actually loads, not merely that the
+   * health probe answered — that probe is deliberately unguarded, so it succeeds
+   * against a server rejecting every other route (#11).
+   */
+  const connected = mode === 'server' && !authError
   const host = serverUrl.replace(/^https?:\/\//, '') || SERVER.host
 
   return (
@@ -74,15 +81,19 @@ function ServerStatusCard() {
         <span
           className={cn(
             'h-[6px] w-[6px] rounded-full',
-            connected
-              ? 'bg-ok shadow-[0_0_0_3px_rgba(63,214,140,.15)]'
-              : 'bg-faint shadow-[0_0_0_3px_rgba(104,113,126,.15)]',
+            connected && 'bg-ok shadow-[0_0_0_3px_rgba(63,214,140,.15)]',
+            authError && 'bg-warn shadow-[0_0_0_3px_rgba(217,161,59,.15)]',
+            !connected && !authError && 'bg-faint shadow-[0_0_0_3px_rgba(104,113,126,.15)]',
           )}
         />
-        {connected ? 'Server connected' : 'Browser storage'}
+        {authError ? 'API key required' : connected ? 'Server connected' : 'Browser storage'}
       </div>
       <div className="font-mono text-[10.5px] leading-relaxed text-faint">
-        {connected ? `${host} · v${info?.version ?? SERVER.version}` : 'No report server — local only'}
+        {authError
+          ? `${host} · rejecting requests`
+          : connected
+            ? `${host} · v${info?.version ?? SERVER.version}`
+            : 'No report server — local only'}
       </div>
       {connected && info && !info.pdf ? (
         <div className="text-[10px] leading-snug text-warn">PDF renderer unavailable</div>

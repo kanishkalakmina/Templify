@@ -388,6 +388,47 @@ try {
   const outB = resolver.resolveDocument(designB, data, { mode: 'print' })
   check('design A output', outA.nodes[0].text, 'John Doe')
   check('design B output', outB.nodes[0].text, 'BILL TO John Doe')
+
+  /*
+   * Authenticated server (#11).
+   *
+   * Enabling `TEMPLIFY_API_KEY` used to empty the editor silently: the frontend
+   * sent no header, every catalogue call answered 401, and a bare `Error` lost
+   * the status so the app could not tell "rejected" from "broken". These pin the
+   * two halves of the fix — the header goes out, and a 401 stays identifiable.
+   */
+  section('Report server authentication')
+
+  const repository = await server.ssrLoadModule('/src/services/templateRepository.ts')
+
+  const unauthorized = new repository.ApiError('Failed to list templates', 401)
+  check('a 401 is identifiable', unauthorized.unauthorized, true)
+  check('a 500 is not treated as an auth problem',
+    new repository.ApiError('Failed to list templates', 500).unauthorized, false)
+  check('the status survives on the error', unauthorized.status, 401)
+
+  // Capture what the repository would put on the wire, without a server.
+  const sent: { url: string; auth: string | null }[] = []
+  const realFetch = globalThis.fetch
+  globalThis.fetch = (async (url: any, init: any = {}) => {
+    sent.push({ url: String(url), auth: new Headers(init.headers ?? {}).get('authorization') })
+    return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+
+  try {
+    await new repository.HttpTemplateRepository('', 'secret123').list()
+    check('a configured key is sent as a bearer token', sent.at(-1)?.auth, 'Bearer secret123')
+
+    await new repository.HttpTemplateRepository('').list()
+    check('no header when no key is configured', sent.at(-1)?.auth, null)
+
+    globalThis.fetch = (async () => new Response('unauthorized', { status: 401 })) as typeof fetch
+    let thrown: any
+    await new repository.HttpTemplateRepository('').list().catch((error: any) => (thrown = error))
+    check('a rejected catalogue throws an identifiable 401', thrown?.unauthorized, true)
+  } finally {
+    globalThis.fetch = realFetch
+  }
 } finally {
   await server.close()
 }

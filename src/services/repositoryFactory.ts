@@ -40,6 +40,18 @@ export async function createRepository(
 ): Promise<RepositoryBinding> {
   const configured = (import.meta.env.VITE_TEMPLIFY_SERVER ?? '').replace(/\/$/, '')
 
+  /*
+   * Build-time key, for a server started with `TEMPLIFY_API_KEY`.
+   *
+   * Be clear about what this is worth: it is compiled into the bundle, and the
+   * bundle is served by the very server it authenticates against — so anyone who
+   * can load the editor can read the key out of it. It buys nothing against
+   * someone who can reach this origin, and exists only so that enabling auth
+   * stops silently emptying the editor (#11). Real protection is an operator
+   * login (#13), where the credential never reaches the client.
+   */
+  const key = import.meta.env.VITE_TEMPLIFY_KEY ?? ''
+
   try {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS)
@@ -53,7 +65,7 @@ export async function createRepository(
       const info = (await response.json()) as ServerInfo
       if (info?.status === 'ok') {
         return {
-          repository: new HttpTemplateRepository(configured),
+          repository: new HttpTemplateRepository(configured, key),
           mode: 'server',
           serverUrl: configured || window.location.origin,
           info,
