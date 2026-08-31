@@ -489,6 +489,17 @@ identical to what the editor shows.
 
 `main` is protected. Everything lands through a pull request with CI green.
 
+### Acknowledgements
+
+Thanks to everyone who has improved Templify:
+
+- [@Yeshu-18](https://github.com/Yeshu-18) — text search on the Template Library
+  ([#16](https://github.com/kanishkalakmina/Templify/pull/16)), reusing the existing
+  `filterTemplates` so library search matches the Templates screen exactly
+
+Contributed something? Add yourself here in the same pull request — it is not presumptuous,
+it is the point.
+
 ## Roadmap
 
 Done:
