@@ -24,8 +24,17 @@ export const config = {
   /** Where templates are persisted. Mount a volume here. */
   dataDir: process.env.TEMPLIFY_DATA_DIR ?? '/data',
 
-  /** Built frontend assets served at the root path. Relative to the app root. */
-  staticDir: process.env.TEMPLIFY_STATIC_DIR ?? path.join(process.cwd(), 'public'),
+  /**
+   * Built frontend assets served at the root path.
+   *
+   * Resolved to an absolute path deliberately. `express.static` tolerates a
+   * relative one, but `res.sendFile` in the SPA fallback does not — it throws
+   * "path must be absolute or specify root", so every client route answered 500
+   * while the assets beside it served fine. That is the documented no-Docker
+   * command (`TEMPLIFY_STATIC_DIR=./dist npm start`); the Docker default is
+   * absolute, which is why it never showed up in the image.
+   */
+  staticDir: path.resolve(process.env.TEMPLIFY_STATIC_DIR ?? path.join(process.cwd(), 'public')),
 
   /**
    * When set, every `/api` route except `/api/health` requires
