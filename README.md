@@ -489,6 +489,21 @@ identical to what the editor shows.
 
 `main` is protected. Everything lands through a pull request with CI green.
 
+### Acknowledgements
+
+Thanks to everyone who has improved Templify.
+
+[![Contributors](https://contrib.rocks/image?repo=kanishkalakmina/Templify)](https://github.com/kanishkalakmina/Templify/graphs/contributors)
+
+That image is rendered from the repository's contributor graph, so it stays current on its
+own — nobody has to remember to add a name, and nobody gets left off.
+
+Worth describing rather than just counting:
+
+- [@Yeshu-18](https://github.com/Yeshu-18) — text search on the Template Library
+  ([#16](https://github.com/kanishkalakmina/Templify/pull/16)), reusing the existing
+  `filterTemplates` so library search matches the Templates screen exactly
+
 ## Roadmap
 
 Done:
