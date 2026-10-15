@@ -124,9 +124,9 @@ Health then reports `"pdf":true` and renders real PDFs.
 | `TEMPLIFY_MAX_BODY` | `8mb` | Request body limit — payloads with base64 logos get large |
 | `PUPPETEER_EXECUTABLE_PATH` | `/usr/bin/chromium` | The browser used for PDF rendering |
 
-`TEMPLIFY_API_KEY` is the *only* credential the server accepts. Keys generated on the API
-screen are illustrative values for showing the shape of the flow — they are held in memory and
-never registered with the server.
+`TEMPLIFY_API_KEY` is the *only* credential the server accepts. There is no way to mint a
+second one from the UI: per-consumer keys need something to authenticate whoever is minting
+them, and the editor is itself unauthenticated today.
 
 **Turning auth on takes two settings, not one.** The server checks `TEMPLIFY_API_KEY`; the
 editor sends `VITE_TEMPLIFY_KEY`, which is compiled in when the frontend is built:
@@ -201,8 +201,8 @@ Shared memory. `--shm-size=512m`, or `shm_size: "512mb"` in Compose.
 The frontend is compiled into the image. `docker compose up -d --build`.
 
 **`401 unauthorized` from `/api/*`**
-`TEMPLIFY_API_KEY` is set on the server. Send `Authorization: Bearer <that value>` — not a key
-generated on the API screen.
+`TEMPLIFY_API_KEY` is set on the server. Send `Authorization: Bearer <that value>` — it is the
+only credential the server accepts.
 
 **The editor shows no templates, but `/api/health` reports several**
 The server is refusing the editor. Confirm with

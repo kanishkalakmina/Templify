@@ -1,10 +1,6 @@
 import { PageBody } from '@/app/AppShell'
-import { Button } from '@/components/ui/Button'
 import { MethodChip } from '@/components/ui/toggles'
 import { CodeBlock } from '@/components/CodeBlock'
-import { useApiKeysStore } from '@/state/apiKeysStore'
-import { useUiStore } from '@/state/uiStore'
-import { copyToClipboard } from '@/utils/download'
 import { SERVER } from '@/data/server'
 
 const REQUEST_BODY = `{
@@ -48,11 +44,6 @@ const ENDPOINTS: { method: 'POST' | 'GET' | 'PUT' | 'DELETE'; path: string; desc
 ]
 
 export function ApiPage() {
-  const keys = useApiKeysStore((s) => s.keys)
-  const generate = useApiKeysStore((s) => s.generate)
-  const revoke = useApiKeysStore((s) => s.revoke)
-  const toast = useUiStore((s) => s.toast)
-
   return (
     <PageBody width={940}>
       <div className="text-[22px] font-semibold tracking-[-.4px]">API</div>
@@ -100,88 +91,40 @@ export function ApiPage() {
       </div>
 
       <div className="mt-4 rounded-2xl border border-line bg-panel p-4">
-        <div className="flex items-start gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="text-[13px] font-semibold">API keys</div>
-            <div className="mt-[6px] text-[12px] leading-relaxed text-muted">
-              Sent as{' '}
-              <span className="font-mono text-accent-link">Authorization: Bearer …</span> on every{' '}
-              <span className="font-mono text-accent-link">/api</span> call. The server accepts
-              exactly one value — whatever{' '}
-              <span className="font-mono text-accent-link">TEMPLIFY_API_KEY</span> is set to in
-              its environment — and requires none at all while that is unset.
-            </div>
-            <div className="mt-[6px] text-[12px] leading-relaxed text-faint">
-              Keys generated below show the shape of the flow and are held in memory only. They
-              are never registered with the server, so set the environment variable to turn auth
-              on.
-            </div>
-          </div>
-          <Button
-            size="md"
-            variant="primary"
-            className="flex-none"
-            onClick={() => {
-              generate()
-              toast({
-                title: 'API key generated',
-                description: 'Copy it now — it is only shown once.',
-              })
-            }}
-          >
-            Generate key
-          </Button>
+        <div className="text-[13px] font-semibold">API keys</div>
+        <div className="mt-[7px] text-[12.5px] leading-relaxed text-muted">
+          Sent as <span className="font-mono text-accent-link">Authorization: Bearer …</span> on
+          every <span className="font-mono text-accent-link">/api</span> call except{' '}
+          <span className="font-mono text-accent-link">/api/health</span>. The server accepts
+          exactly one credential — whatever{' '}
+          <span className="font-mono text-accent-link">TEMPLIFY_API_KEY</span> is set to in its
+          environment — and requires none at all while that is unset, which is the right default
+          for a container on a network you already trust.
         </div>
 
-        <div className="mt-[14px] flex flex-col gap-2">
-          {keys.map((key) => (
-            <div
-              key={key.id}
-              className="flex items-center gap-[11px] rounded-xl border border-line bg-toolbar px-3 py-[11px]"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-[12px] font-medium">{key.label}</span>
-                <span
-                  className={`mt-[3px] block truncate font-mono text-[11px] ${
-                    key.revealed ? 'text-accent-link' : 'text-faint'
-                  }`}
-                >
-                  {key.revealed ? key.value : `${SERVER.keyPrefix}••••••••••••${key.value.slice(-4)}`}
-                </span>
-                <span className="mt-[3px] block text-[10.5px] text-faint">
-                  Created {key.created} ·{' '}
-                  {key.revealed ? 'visible once — copy it now' : `last used ${key.lastUsed}`}
-                </span>
-              </span>
-              <Button
-                size="xs"
-                className="flex-none"
-                onClick={async () => {
-                  const ok = await copyToClipboard(key.value)
-                  toast({ title: ok ? 'API key copied' : 'Could not copy', tone: ok ? 'default' : 'danger' })
-                }}
-              >
-                Copy
-              </Button>
-              <Button
-                size="xs"
-                variant="danger"
-                className="flex-none"
-                onClick={() => {
-                  revoke(key.id)
-                  toast({ title: 'API key revoked' })
-                }}
-              >
-                Revoke
-              </Button>
-            </div>
-          ))}
+        <div className="mt-3 text-[12.5px] leading-relaxed text-muted">
+          Turning it on takes two settings, not one. The server checks{' '}
+          <span className="font-mono text-accent-link">TEMPLIFY_API_KEY</span> at runtime; this
+          editor sends <span className="font-mono text-accent-link">VITE_TEMPLIFY_KEY</span>,
+          which is compiled in when the frontend is built. Set one without the other and the
+          workspace comes up empty, because every catalogue call is being refused.
+        </div>
 
-          {!keys.length ? (
-            <div className="rounded-xl border border-dashed border-line px-4 py-[22px] text-center text-[11.5px] text-faint">
-              No API keys yet. Generate one to let your application call the render endpoint.
-            </div>
-          ) : null}
+        <pre className="mt-3 overflow-auto rounded-lg border border-line bg-app p-3 font-mono text-[11px] leading-[1.65] text-ink-3">{`TEMPLIFY_API_KEY=<key>    # server, at runtime
+VITE_TEMPLIFY_KEY=<key>   # frontend, at build time`}</pre>
+
+        <div className="mt-3 rounded-xl border border-line bg-toolbar px-3 py-[11px] text-[11.5px] leading-relaxed text-faint">
+          The editor's copy of the key is compiled into the bundle this same server hands to
+          every browser, so anyone who can open the editor can read it. That keeps the editor
+          working; it is not a security boundary. Keeping the instance off the public network is
+          what protects it.
+        </div>
+
+        <div className="mt-3 text-[11.5px] leading-relaxed text-faint">
+          Per-consumer keys — minted here, stored as hashes, revoked individually — are not
+          available yet. They need something to authenticate the person doing the minting, and
+          today the editor itself is unauthenticated, so a mint button would hand server
+          credentials to anyone who can load this page.
         </div>
       </div>
 

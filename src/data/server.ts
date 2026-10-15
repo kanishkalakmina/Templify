@@ -14,7 +14,6 @@ export const SERVER = {
   internalHost: 'http://templify:8080',
   version: '1.1.0',
   status: 'Running',
-  keyPrefix: 'tf_live_',
   envVar: 'TEMPLIFY_KEY',
 } as const
 
