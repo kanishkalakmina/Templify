@@ -15,6 +15,7 @@ import { config } from './config'
 import { TemplateStore } from './storage'
 import { closeBrowser, htmlToPdf, probeChromium, renderTemplate } from './renderer'
 import { availableScripts } from './fonts'
+import { contentDisposition, headerList } from './http'
 import { LOCALES } from '../src/i18n/locales'
 import type { ReportTemplate } from '../src/types/template'
 import { parseHandle, templateAtVersion } from '../src/services/versioning'
@@ -180,7 +181,7 @@ app.post('/api/reports/render', requireKey, async (req, res) => {
   // are always reported. `strict` turns them into a hard error rather than a
   // silently blank field.
   if (doc.missingBindings.length) {
-    res.setHeader('X-Templify-Missing-Bindings', doc.missingBindings.join(','))
+    res.setHeader('X-Templify-Missing-Bindings', headerList(doc.missingBindings))
     if (options?.strict) {
       res.status(422).json({
         error: 'missing_bindings',
@@ -196,16 +197,17 @@ app.post('/api/reports/render', requireKey, async (req, res) => {
 
   if (options?.format === 'html') {
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
-    res.setHeader('Content-Disposition', `inline; filename="${filename}.html"`)
+    res.setHeader('Content-Disposition', contentDisposition('inline', `${filename}.html`))
     res.send(html)
     return
   }
 
+  // Only the conversion is guarded. Setting the response headers used to sit
+  // inside this block, so a header the runtime rejected was reported as
+  // `render_failed` — blaming Chromium for a PDF it had already produced.
+  let pdf: Uint8Array
   try {
-    const pdf = await htmlToPdf(html, doc.width, doc.height)
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="${filename}.pdf"`)
-    res.send(Buffer.from(pdf))
+    pdf = await htmlToPdf(html, doc.width, doc.height)
   } catch (error) {
     console.error('[render] PDF generation failed:', error)
     res.status(500).json({
@@ -213,7 +215,12 @@ app.post('/api/reports/render', requireKey, async (req, res) => {
       message: 'The document could not be converted to PDF.',
       detail: (error as Error).message,
     })
+    return
   }
+
+  res.setHeader('Content-Type', 'application/pdf')
+  res.setHeader('Content-Disposition', contentDisposition('inline', `${filename}.pdf`))
+  res.send(Buffer.from(pdf))
 })
 
 /* -------------------------------------------------------------------------- */

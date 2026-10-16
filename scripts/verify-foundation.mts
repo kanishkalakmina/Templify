@@ -429,6 +429,34 @@ try {
   } finally {
     globalThis.fetch = realFetch
   }
+  section('Response header encoding')
+
+  const http = await server.ssrLoadModule('/server/http.ts')
+  const latin1 = (value: string) => /^[\x20-\x7E]*$/.test(value)
+
+  // Node rejects any header value outside latin-1, so these used to throw
+  // ERR_INVALID_CHAR and 500 a render that had already succeeded.
+  const sinhala = http.contentDisposition('inline', 'ශ්‍රී-invoice.pdf')
+  check('a non-ascii filename is header-safe', latin1(sinhala), true)
+  check('a non-ascii filename keeps an exact copy', sinhala.includes("filename*=UTF-8''"), true)
+  check('an ascii filename needs no second copy',
+    http.contentDisposition('inline', 'invoice.pdf'), 'inline; filename="invoice.pdf"')
+  check('a quote cannot escape the quoted string',
+    http.contentDisposition('inline', 'in"voice.pdf'),
+    'inline; filename="in-voice.pdf"; filename*=UTF-8\'\'in%22voice.pdf')
+  check('path separators are flattened',
+    http.contentDisposition('attachment', '../../etc/passwd'),
+    'attachment; filename="..-..-etc-passwd"; filename*=UTF-8\'\'..%2F..%2Fetc%2Fpasswd')
+  check('an empty name still yields one',
+    http.contentDisposition('inline', ''), 'inline; filename="document"')
+
+  // The missing-binding diagnostic is built from paths written into the
+  // template, so it carries whatever script the author used.
+  check('a non-ascii binding path is header-safe',
+    latin1(http.headerList(['invoice.客户', 'customer.vatNumber'])), true)
+  check('the comma separator stays unambiguous', http.headerList(['a,b', 'c']), 'a%2Cb,c')
+  check('an ordinary path is unchanged', http.headerList(['customer.vatNumber']), 'customer.vatNumber')
+  check('no bindings yields an empty header', http.headerList([]), '')
 } finally {
   await server.close()
 }
